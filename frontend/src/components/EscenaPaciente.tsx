@@ -218,7 +218,7 @@ const EscenaPaciente = ({ lectura }: Props) => {
 
         {/* Tag peso ESP32 flotante */}
         <rect x="420" y="295" width="90" height="26" rx="5" fill="rgba(2,12,22,0.88)" stroke="rgba(0,180,255,0.3)" strokeWidth={1}/>
-        <text x="465" y="305" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="5.5" fill="rgba(0,180,255,0.7)" letterSpacing="0.5">ESP32 · HX711</text>
+        <text x="465" y="305" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="5.5" fill="rgba(0,180,255,0.7)" letterSpacing="0.5">HX711</text>
         <text x="465" y="317" textAnchor="middle" fontFamily="Orbitron" fontWeight="700" fontSize="9" fill="rgba(0,220,255,0.95)">{peso.toFixed(1)} g IV</text>
 
         {/* Tag FC flotante */}
@@ -347,13 +347,13 @@ const EscenaPaciente = ({ lectura }: Props) => {
 
         {/* Tag nombre sobre la cabeza */}
         <rect x="603" y="210" width="86" height="24" rx="5" fill="rgba(2,10,24,0.92)" stroke="rgba(0,180,255,0.28)" strokeWidth={1}/>
-        <text x="646" y="220" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="6.5" fill="rgba(0,200,255,0.7)"  letterSpacing="0.5">DR. HERRERA QUISPE</text>
-        <text x="646" y="230" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="6"   fill="rgba(0,229,255,0.45)" letterSpacing="0.3">MÉDICO UCI · TURNO MAÑANA</text>
+        <text x="646" y="220" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="6.5" fill="rgba(0,200,255,0.7)"  letterSpacing="0.5">DR. PAREDES</text>
+        <text x="646" y="230" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="6"   fill="rgba(0,229,255,0.45)" letterSpacing="0.3">TURNO MAÑANA</text>
         {/* Monitor ECG en mesita */}
         <rect x="48" y="368" width="84" height="64" fill="#0a1e30" rx="5" stroke="#0d2a40" strokeWidth={1}/>
         <rect x="50" y="370" width="80" height="58" fill="#060f1a" rx="4"/>
         <rect x="52" y="372" width="76" height="38" fill="#020f08" rx="3"/>
-        <text x="90" y="382" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="6" fill="rgba(0,200,80,0.5)" letterSpacing="1">ECG</text>
+        <text x="90" y="382" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="6" fill="rgba(0,200,80,0.5)" letterSpacing="1">Estado BPM</text>
         <polyline
           points="54,398 60,398 63,386 66,411 69,398 76,398 83,398 90,398 97,398 104,398 110,398 122,398"
           fill="none" stroke="rgba(0,220,80,0.85)" strokeWidth={1.3} strokeLinecap="round"/>
@@ -362,9 +362,6 @@ const EscenaPaciente = ({ lectura }: Props) => {
         <rect x="84"  y="432" width="6" height="28" fill="#0a1e30" rx="2"/>
         <rect x="112" y="432" width="6" height="28" fill="#0a1e30" rx="2"/>
 
-        {/* LED ESP32 status */}
-        <circle className="sv-led" cx="456" cy="348" r="4" fill="#00ff9d" style={{ filter: "drop-shadow(0 0 6px #00ff9d)" }}/>
-        <text x="465" y="352" fontFamily="Share Tech Mono" fontSize="6" fill="rgba(0,255,157,0.7)" letterSpacing="0.5">ESP32</text>
       </svg>
     </div>
   );

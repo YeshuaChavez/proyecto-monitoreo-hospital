@@ -8,7 +8,7 @@ interface Props { lectura: Lectura; }
 
 const datosIniciales: PacienteInfo = {
   nombre: "Juan Carlos", apellido: "Quispe Mamani",
-  id: "PCT-2026-0042", cama: "04", doctor: "Dr. Herrera Quispe",
+  id: "PCT-2026-0042", cama: "04", doctor: "Dr. Paredes Villanueva",
   grupoSanguineo: "O+", fechaNacimiento: "15-03-1975",
   fechaIngreso: "20-02-2026", direccion: "Av. Universitaria 1801, Lima",
   contactoNombre: "María Quispe", contactoTelefono: "987 654 321",
