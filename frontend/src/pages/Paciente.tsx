@@ -157,31 +157,6 @@ const Paciente = ({ lectura }: Props) => {
                 <Campo label="Relación" valor={paciente.contactoRelacion}/>
               </>
             )}
-
-            {/* Signos complementarios dentro del mismo card */}
-            <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", marginTop: 13, paddingTop: 13 }}>
-              <SeccionLabel color="#f43f5e">SIGNOS COMPLEMENTARIOS</SeccionLabel>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
-
-                <div style={{ background: "rgba(244,63,94,0.06)", border: "1px solid rgba(244,63,94,0.14)", borderRadius: 10, padding: "11px", textAlign: "center" }}>
-                  <div style={{ fontSize: 18, marginBottom: 3 }}>🌡️</div>
-                  <div style={{ fontSize: 8.5, color: "#6b7280", fontFamily: "'JetBrains Mono', monospace", marginBottom: 3 }}>TEMPERATURA</div>
-                  {editando
-                    ? <input style={{ ...inp, textAlign: "center" }} value={temp.temperatura} onChange={e => setTemp(p => ({ ...p, temperatura: e.target.value }))}/>
-                    : <><div style={{ fontSize: 21, fontWeight: 800, color: "#f43f5e", fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>{paciente.temperatura}°</div><div style={{ fontSize: 9, color: "#6b7280", marginTop: 2 }}>Celsius</div></>
-                  }
-                </div>
-
-                <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.14)", borderRadius: 10, padding: "11px", textAlign: "center" }}>
-                  <div style={{ fontSize: 18, marginBottom: 3 }}>💉</div>
-                  <div style={{ fontSize: 8.5, color: "#6b7280", fontFamily: "'JetBrains Mono', monospace", marginBottom: 3 }}>PRESIÓN ART.</div>
-                  {editando
-                    ? <input style={{ ...inp, textAlign: "center" }} value={temp.presionArterial} onChange={e => setTemp(p => ({ ...p, presionArterial: e.target.value }))}/>
-                    : <><div style={{ fontSize: 19, fontWeight: 800, color: "#f59e0b", fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>{paciente.presionArterial}</div><div style={{ fontSize: 9, color: "#6b7280", marginTop: 2 }}>mmHg</div></>
-                  }
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* ┌── 3. Fluido IV y Bomba ──┐ */}
