@@ -205,6 +205,24 @@ async def enviar_comando(body: ComandoRequest):
     return {"ok": True, "cmd": body.cmd, "timestamp": datetime.utcnow().isoformat()}
 
 # ═══════════════════════════════════════════════════════════════
+#  REST — ENVIAR CORREO A CONTACTO DEL PACIENTE
+# ═══════════════════════════════════════════════════════════════
+class EmailRequest(BaseModel):
+    destinatario: str
+    payload: dict = {}
+    alertas: list = []
+
+@app.post("/enviar-email")
+async def enviar_email_endpoint(body: EmailRequest):
+    from email_service import enviar_email_familiar
+    await enviar_email_familiar(
+        payload      = body.payload,
+        alertas      = body.alertas,
+        destinatario = body.destinatario
+    )
+    return {"ok": True, "destinatario": body.destinatario}
+
+# ═══════════════════════════════════════════════════════════════
 #  REST — STATS para analytics
 # ═══════════════════════════════════════════════════════════════
 @app.get("/stats")
