@@ -9,7 +9,7 @@ import "./index.css";
 
 function App() {
   const [tab, setTab] = useState("paciente");
-  const { lectura, historial, conectado, alertas, limpiarAlertas } = useLecturas(true);
+  const { live: lectura, historial, conectado, alertas, setAlertas } = useLecturas();
 
   return (
     <div style={{
@@ -30,7 +30,7 @@ function App() {
         {tab === "overview" && <Monitor lectura={lectura} historial={historial} />}
         {tab === "analytics" && <Analytics lectura={lectura} historial={historial} />}
         {tab === "paciente" && <Paciente lectura={lectura} />}
-        {tab === "alertas" && <Alertas alertas={alertas} limpiarAlertas={limpiarAlertas} />}
+        {tab === "alertas" && <Alertas alertas={alertas} limpiarAlertas={() => setAlertas([])} />}
       </main>
 
       <footer style={{
