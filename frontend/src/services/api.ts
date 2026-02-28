@@ -27,3 +27,12 @@ export async function enviarComando(cmd: "bomba_on" | "bomba_off" | "reset") {
   });
   return res.json();
 }
+
+export async function enviarEmail(destinatario: string, payload: object, alertas: object[]) {
+  const res = await fetch(`${API.base}/enviar-email`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ destinatario, payload, alertas }),
+  });
+  return res.json();
+}

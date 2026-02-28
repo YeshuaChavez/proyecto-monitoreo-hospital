@@ -3,7 +3,7 @@ import InsigniaAlerta from "../components/InsigniaAlerta";
 import BarraFluido from "../components/BarraFluido";
 import EscenaPaciente from "../components/EscenaPaciente";
 import { PacienteInfo, Lectura } from "../tipos";
-import { enviarComando } from "../services/api";
+import { enviarComando, enviarEmail } from "../services/api";
 
 interface Props { lectura: Lectura; }
 
@@ -40,13 +40,17 @@ const Paciente = ({ lectura }: Props) => {
   const [enviando, setEnviando]   = useState(false);
   const [error, setError]         = useState<string | null>(null);
 
+  // Estados modal email
+  const [modalEmail, setModalEmail]           = useState(false);
+  const [emailDest, setEmailDest]             = useState("");
+  const [enviandoEmail, setEnviandoEmail]     = useState(false);
+  const [emailOk, setEmailOk]                 = useState<string | null>(null);
+
   const guardar  = () => { setPaciente(temp); setEditando(false); };
   const cancelar = () => { setTemp(paciente);  setEditando(false); };
 
   const fluidoStatus = lectura.peso < 50 ? "critical" : lectura.peso < 100 ? "warn" : "ok";
   const bombaOn = lectura.bomba;
-
-  // Estado legible
   const estadoBomba = bombaOn ? "AUTO — Bomba activa por ESP32" : "STANDBY — Bomba en espera";
 
   const handleComando = async (cmd: "bomba_on" | "bomba_off") => {
@@ -54,10 +58,25 @@ const Paciente = ({ lectura }: Props) => {
     setError(null);
     try {
       await enviarComando(cmd);
-    } catch (e) {
+    } catch {
       setError("Error al enviar comando. Verifica la conexión.");
     } finally {
       setEnviando(false);
+    }
+  };
+
+  const handleEnviarEmail = async () => {
+    if (!emailDest) return;
+    setEnviandoEmail(true);
+    setEmailOk(null);
+    try {
+      await enviarEmail(emailDest, lectura, []);
+      setEmailOk("✅ Correo enviado correctamente");
+      setTimeout(() => { setModalEmail(false); setEmailOk(null); setEmailDest(""); }, 2000);
+    } catch {
+      setEmailOk("❌ Error al enviar correo");
+    } finally {
+      setEnviandoEmail(false);
     }
   };
 
@@ -85,7 +104,21 @@ const Paciente = ({ lectura }: Props) => {
               <button onClick={cancelar} style={{ background: "rgba(107,114,128,0.1)",  border: "1px solid rgba(107,114,128,0.3)", color: "#6b7280", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer" }}>Cancelar</button>
             </>
           ) : (
-            <button onClick={() => setEditando(true)} style={{ background: "rgba(0,229,255,0.07)", border: "1px solid rgba(0,229,255,0.25)", color: "#00e5ff", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>✏️ Editar datos</button>
+            <>
+              <button onClick={() => setEditando(true)} style={{ background: "rgba(0,229,255,0.07)", border: "1px solid rgba(0,229,255,0.25)", color: "#00e5ff", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>✏️ Editar datos</button>
+              {/* Botón enviar email */}
+              <button
+                onClick={() => setModalEmail(true)}
+                style={{
+                  background: "rgba(16,185,129,0.07)",
+                  border: "1px solid rgba(16,185,129,0.25)",
+                  color: "#10b981", borderRadius: 8,
+                  padding: "7px 16px", fontSize: 12,
+                  cursor: "pointer", fontWeight: 600,
+                }}>
+                📧 Enviar reporte
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -205,7 +238,6 @@ const Paciente = ({ lectura }: Props) => {
                 }}>
                 {enviando ? "..." : "▶ INICIAR"}
               </button>
-
               <button
                 onClick={() => handleComando("bomba_off")}
                 disabled={enviando || !bombaOn}
@@ -243,6 +275,115 @@ const Paciente = ({ lectura }: Props) => {
 
         </div>
       </div>
+
+      {/* ── Modal Email ── */}
+      {modalEmail && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 999,
+          background: "rgba(0,0,0,0.7)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            background: "#0d111c",
+            border: "1px solid rgba(0,229,255,0.2)",
+            borderRadius: 16, padding: 28,
+            width: 400, position: "relative",
+          }}>
+            {/* Top bar verde */}
+            <div style={{
+              position: "absolute", top: 0, left: 0, right: 0, height: 2,
+              background: "linear-gradient(90deg,transparent,#10b981,transparent)",
+              borderRadius: "16px 16px 0 0",
+            }}/>
+
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 6px", color: "#f1f5f9" }}>
+              📧 Enviar reporte por correo
+            </h3>
+            <p style={{ fontSize: 11, color: "#4b5563", margin: "0 0 20px", fontFamily: "'JetBrains Mono', monospace" }}>
+              Se enviará el reporte del paciente con PDF adjunto
+            </p>
+
+            {/* Input email */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 6, fontFamily: "'JetBrains Mono', monospace" }}>
+                CORREO DESTINATARIO
+              </div>
+              <input
+                type="email"
+                placeholder="familiar@gmail.com"
+                value={emailDest}
+                onChange={e => setEmailDest(e.target.value)}
+                style={{
+                  width: "100%", background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(0,229,255,0.3)",
+                  color: "#e2e8f0", borderRadius: 8,
+                  padding: "10px 14px", fontSize: 13,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  outline: "none", boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            {/* Info del paciente */}
+            <div style={{
+              background: "rgba(0,229,255,0.04)",
+              border: "1px solid rgba(0,229,255,0.1)",
+              borderRadius: 8, padding: "10px 14px", marginBottom: 16,
+              fontSize: 11, color: "#6b7280",
+              fontFamily: "'JetBrains Mono', monospace",
+            }}>
+              <div>Paciente: <span style={{ color: "#e2e8f0" }}>{paciente.nombre} {paciente.apellido}</span></div>
+              <div>
+                FC: <span style={{ color: "#f43f5e" }}>{lectura.fc > 0 ? lectura.fc + " bpm" : "--"}</span>
+                {"  "}SpO2: <span style={{ color: "#00e5ff" }}>{lectura.spo2 > 0 ? lectura.spo2 + "%" : "--"}</span>
+                {"  "}IV: <span style={{ color: "#a78bfa" }}>{lectura.peso.toFixed(1)}g</span>
+              </div>
+            </div>
+
+            {/* Resultado */}
+            {emailOk && (
+              <div style={{
+                marginBottom: 12, fontSize: 12, fontWeight: 600,
+                color: emailOk.startsWith("✅") ? "#10b981" : "#ef4444",
+                fontFamily: "'JetBrains Mono', monospace",
+              }}>
+                {emailOk}
+              </div>
+            )}
+
+            {/* Botones */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={handleEnviarEmail}
+                disabled={enviandoEmail || !emailDest}
+                style={{
+                  flex: 1,
+                  background: (!emailDest || enviandoEmail) ? "rgba(16,185,129,0.04)" : "rgba(16,185,129,0.15)",
+                  border: `1px solid ${(!emailDest || enviandoEmail) ? "rgba(16,185,129,0.1)" : "rgba(16,185,129,0.4)"}`,
+                  color: (!emailDest || enviandoEmail) ? "#374151" : "#10b981",
+                  borderRadius: 8, padding: "10px 0",
+                  fontSize: 13, fontWeight: 700,
+                  cursor: (!emailDest || enviandoEmail) ? "not-allowed" : "pointer",
+                }}>
+                {enviandoEmail ? "Enviando..." : "📧 Enviar"}
+              </button>
+              <button
+                onClick={() => { setModalEmail(false); setEmailDest(""); setEmailOk(null); }}
+                style={{
+                  flex: 1, background: "rgba(107,114,128,0.07)",
+                  border: "1px solid rgba(107,114,128,0.22)",
+                  color: "#6b7280", borderRadius: 8,
+                  padding: "10px 0", fontSize: 13,
+                  cursor: "pointer",
+                }}>
+                Cancelar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
