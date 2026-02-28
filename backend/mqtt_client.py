@@ -48,7 +48,7 @@ class MQTTManager:
         db = SessionLocal()
         try:
             lectura = Lectura(
-                timestamp       = datetime.utcnow(),
+                timestamp = datetime.utcnow() - __import__('datetime').timedelta(hours=5),  # Ajuste a UTC-5 (Lima)
                 fc              = payload.get("fc"),
                 spo2            = payload.get("spo2"),
                 peso            = payload.get("peso"),
