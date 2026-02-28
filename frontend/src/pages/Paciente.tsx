@@ -41,13 +41,13 @@ const Paciente = ({ lectura }: Props) => {
   const [error, setError]         = useState<string | null>(null);
 
   // Estados modal email
-  const [modalEmail, setModalEmail]           = useState(false);
-  const [emailDest, setEmailDest]             = useState("");
-  const [enviandoEmail, setEnviandoEmail]     = useState(false);
-  const [emailOk, setEmailOk]                 = useState<string | null>(null);
+  const [modalEmail, setModalEmail]       = useState(false);
+  const [emailDest, setEmailDest]         = useState("");
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
+  const [emailOk, setEmailOk]             = useState<string | null>(null);
 
   const guardar  = () => { setPaciente(temp); setEditando(false); };
-  const cancelar = () => { setTemp(paciente);  setEditando(false); };
+  const cancelar = () => { setTemp(paciente); setEditando(false); };
 
   const fluidoStatus = lectura.peso < 50 ? "critical" : lectura.peso < 100 ? "warn" : "ok";
   const bombaOn = lectura.bomba;
@@ -100,25 +100,11 @@ const Paciente = ({ lectura }: Props) => {
         <div style={{ display: "flex", gap: 8 }}>
           {editando ? (
             <>
-              <button onClick={guardar}  style={{ background: "rgba(16,185,129,0.15)",  border: "1px solid rgba(16,185,129,0.4)",  color: "#10b981", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Guardar</button>
-              <button onClick={cancelar} style={{ background: "rgba(107,114,128,0.1)",  border: "1px solid rgba(107,114,128,0.3)", color: "#6b7280", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer" }}>Cancelar</button>
+              <button onClick={guardar}  style={{ background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.4)",  color: "#10b981", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Guardar</button>
+              <button onClick={cancelar} style={{ background: "rgba(107,114,128,0.1)", border: "1px solid rgba(107,114,128,0.3)", color: "#6b7280", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer" }}>Cancelar</button>
             </>
           ) : (
-            <>
-              <button onClick={() => setEditando(true)} style={{ background: "rgba(0,229,255,0.07)", border: "1px solid rgba(0,229,255,0.25)", color: "#00e5ff", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>✏️ Editar datos</button>
-              {/* Botón enviar email */}
-              <button
-                onClick={() => setModalEmail(true)}
-                style={{
-                  background: "rgba(16,185,129,0.07)",
-                  border: "1px solid rgba(16,185,129,0.25)",
-                  color: "#10b981", borderRadius: 8,
-                  padding: "7px 16px", fontSize: 12,
-                  cursor: "pointer", fontWeight: 600,
-                }}>
-                📧 Enviar reporte
-              </button>
-            </>
+            <button onClick={() => setEditando(true)} style={{ background: "rgba(0,229,255,0.07)", border: "1px solid rgba(0,229,255,0.25)", color: "#00e5ff", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>✏️ Editar datos</button>
           )}
         </div>
       </div>
@@ -196,6 +182,24 @@ const Paciente = ({ lectura }: Props) => {
               <>
                 <Campo label="Teléfono" valor={paciente.contactoTelefono}/>
                 <Campo label="Relación" valor={paciente.contactoRelacion}/>
+
+                {/* Botón enviar reporte — debajo del contacto familiar */}
+                <div style={{ marginTop: 14 }}>
+                  <button
+                    onClick={() => setModalEmail(true)}
+                    style={{
+                      width: "100%",
+                      background: "rgba(16,185,129,0.07)",
+                      border: "1px solid rgba(16,185,129,0.25)",
+                      color: "#10b981", borderRadius: 8,
+                      padding: "9px 0", fontSize: 12,
+                      cursor: "pointer", fontWeight: 700,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      letterSpacing: "0.06em",
+                    }}>
+                    📧 ENVIAR REPORTE AL FAMILIAR
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -217,8 +221,8 @@ const Paciente = ({ lectura }: Props) => {
                 <span style={{ fontSize: 9, color: "#374151", fontFamily: "'JetBrains Mono', monospace" }}>500g</span>
               </div>
               <div style={{ marginTop: 7, fontSize: 10, color: "#4b5563", display: "flex", gap: 12 }}>
-                <span><span style={{ color: "#f59e0b" }}>▸</span> Auto: 100g</span>
-                <span><span style={{ color: "#ef4444" }}>▸</span> Crítico: 50g</span>
+                <span><span style={{ color: "#f59e0b" }}>▸</span> Advertencia: 150g</span>
+                <span><span style={{ color: "#ef4444" }}>▸</span> Estado Crítico: 100g</span>
               </div>
             </div>
 
