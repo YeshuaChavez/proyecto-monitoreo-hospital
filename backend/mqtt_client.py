@@ -5,18 +5,20 @@ MQTTManager:
   - Detecta alertas y las guarda
   - Hace broadcast por WebSocket a todos los clientes conectados
   - Publica comandos de vuelta al ESP32
+  - Envía notificaciones a Telegram cuando hay alertas
 """
 
 import asyncio
 import json
 import os
 import ssl
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import aiomqtt
 
 from database import SessionLocal
 from models import Lectura, Alerta
+from telegram_bot import enviar_alerta, construir_mensaje
 
 # ── Credenciales HiveMQ (variables de entorno Railway) ────────
 MQTT_HOST   = os.environ.get("MQTT_HOST",   "fd3a3baad98a46c3a2a0caabe973c4b3.s1.eu.hivemq.cloud")
@@ -30,32 +32,36 @@ TOPIC_VITALES  = "hospital/cama04/vitales"
 TOPIC_COMANDOS = "hospital/cama04/comandos"
 
 # ── Umbrales para alertas automáticas ─────────────────────────
-UMBRAL_FC_ALTA  = 100
-UMBRAL_FC_BAJA  = 60
-UMBRAL_SPO2     = 95
+UMBRAL_FC_ALTA       = 100
+UMBRAL_FC_BAJA       = 60
+UMBRAL_SPO2          = 95
 UMBRAL_SUERO_ALERTA  = 150.0
 UMBRAL_SUERO_CRITICO = 100.0
+
+# ── Anti-spam Telegram — mínimo 15s entre notificaciones ──────
+INTERVALO_TELEGRAM = 15  # segundos
 
 
 class MQTTManager:
     def __init__(self):
         self._client = None
-        self._ultimo_estado: dict = {}   # cache última lectura
+        self._ultimo_estado: dict = {}
         self._cola_comandos: asyncio.Queue = asyncio.Queue()
+        self._ultimo_telegram: datetime = datetime.min  # control anti-spam
 
     # ── Guardar lectura en MySQL ───────────────────────────────
     def _guardar_lectura(self, payload: dict, topic: str) -> Lectura:
         db = SessionLocal()
         try:
             lectura = Lectura(
-                timestamp = datetime.utcnow() - __import__('datetime').timedelta(hours=5),  # Ajuste a UTC-5 (Lima)
-                fc              = payload.get("fc"),
-                spo2            = payload.get("spo2"),
-                peso            = payload.get("peso"),
-                bomba           = bool(payload.get("bomba", False)),
-                estado_suero    = payload.get("estado"),
-                estado_vitales  = payload.get("estado_vitales"),
-                topic           = topic,
+                timestamp      = datetime.utcnow() - timedelta(hours=5),  # UTC-5 Lima
+                fc             = payload.get("fc"),
+                spo2           = payload.get("spo2"),
+                peso           = payload.get("peso"),
+                bomba          = bool(payload.get("bomba", False)),
+                estado_suero   = payload.get("estado"),
+                estado_vitales = payload.get("estado_vitales"),
+                topic          = topic,
             )
             db.add(lectura)
             db.commit()
@@ -64,7 +70,7 @@ class MQTTManager:
         finally:
             db.close()
 
-    # ── Detectar y guardar alertas ────────────────────────────
+    # ── Detectar y guardar alertas ─────────────────────────────
     def _verificar_alertas(self, payload: dict):
         db = SessionLocal()
         try:
@@ -123,11 +129,11 @@ class MQTTManager:
         finally:
             db.close()
 
-    # ── Publicar comando al ESP32 ─────────────────────────────
+    # ── Publicar comando al ESP32 ──────────────────────────────
     async def publicar_comando(self, cmd: str):
         await self._cola_comandos.put(cmd)
 
-    # ── Loop principal MQTT ───────────────────────────────────
+    # ── Loop principal MQTT ────────────────────────────────────
     async def start(self, ws_manager):
         """Corre indefinidamente, reconecta si se cae."""
         while True:
@@ -150,7 +156,6 @@ class MQTTManager:
                     await client.subscribe("hospital/cama04/#")
                     print("📡 Suscrito: hospital/cama04/#")
 
-                    # Procesar mensajes + comandos concurrentemente
                     await asyncio.gather(
                         self._recibir(client, ws_manager),
                         self._enviar_comandos(client),
@@ -163,10 +168,10 @@ class MQTTManager:
             print("🔄 Reconectando MQTT en 5s...")
             await asyncio.sleep(5)
 
-    # ── Recibir mensajes ──────────────────────────────────────
+    # ── Recibir mensajes ───────────────────────────────────────
     async def _recibir(self, client, ws_manager):
         async for msg in client.messages:
-            topic   = str(msg.topic)
+            topic       = str(msg.topic)
             payload_raw = msg.payload.decode("utf-8", errors="ignore")
 
             try:
@@ -183,21 +188,35 @@ class MQTTManager:
             # Detectar alertas
             alertas = self._verificar_alertas(payload)
 
-            # Broadcast WebSocket
+            # Broadcast WebSocket → dashboard React
             await ws_manager.broadcast({
                 "type":    "lectura",
                 "data":    lectura.to_dict(),
                 "alertas": alertas,
             })
 
-            # Si hay alertas también broadcast por separado
+            # Broadcast alertas por separado si las hay
             if alertas:
                 await ws_manager.broadcast({
-                    "type":    "alertas",
-                    "data":    alertas,
+                    "type": "alertas",
+                    "data": alertas,
                 })
 
-    # ── Enviar comandos encolados ─────────────────────────────
+                # ── Notificación Telegram (anti-spam: máx 1 por minuto) ──
+                ahora = datetime.utcnow()
+                segundos_desde_ultimo = (ahora - self._ultimo_telegram).total_seconds()
+
+                if segundos_desde_ultimo >= INTERVALO_TELEGRAM:
+                    msg_telegram = construir_mensaje(payload, alertas)
+                    if msg_telegram:
+                        await enviar_alerta(msg_telegram)
+                        self._ultimo_telegram = ahora
+                        print("📱 Notificación Telegram enviada")
+                else:
+                    restante = int(INTERVALO_TELEGRAM - segundos_desde_ultimo)
+                    print(f"📱 Telegram en espera anti-spam ({restante}s restantes)")
+
+    # ── Enviar comandos encolados ──────────────────────────────
     async def _enviar_comandos(self, client):
         while True:
             cmd = await self._cola_comandos.get()

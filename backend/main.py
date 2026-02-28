@@ -26,6 +26,8 @@ from database import engine, SessionLocal, init_db
 from models import Lectura, Alerta
 from mqtt_client import MQTTManager
 
+from telegram_bot import polling
+
 # ── Singleton MQTT ────────────────────────────────────────────
 mqtt_manager = MQTTManager()
 
@@ -58,16 +60,15 @@ ws_manager = ConnectionManager()
 # ── Lifespan ─────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Inicializar DB
     init_db()
-    # Arrancar loop MQTT en background
-    task = asyncio.create_task(
-        mqtt_manager.start(ws_manager)
-    )
+    task_mqtt     = asyncio.create_task(mqtt_manager.start(ws_manager))
+    task_telegram = asyncio.create_task(polling())  
     yield
-    task.cancel()
+    task_mqtt.cancel()
+    task_telegram.cancel()
     try:
-        await task
+        await task_mqtt
+        await task_telegram
     except asyncio.CancelledError:
         pass
 
