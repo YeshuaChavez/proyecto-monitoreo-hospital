@@ -1,73 +1,103 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Lectura, Alerta } from "../tipos";
-import { obtenerUltimaLectura } from "../services/api";
+import { API, getLecturas, getAlertas } from "../services/api";
 
-const MAX_HISTORIAL = 30;
+const SIMULAR = false;
 
-const generarLectura = (prev?: Lectura): Lectura => {
-    const fc = Math.max(50, Math.min(130, (prev?.fc ?? 75) + (Math.random() - 0.5) * 6));
-    const spo2 = Math.max(88, Math.min(100, (prev?.spo2 ?? 97) + (Math.random() - 0.5) * 1.5));
-    const peso = Math.max(0, Math.min(500, (prev?.peso ?? 350) - Math.random() * 2));
-    return {
-        fc: +fc.toFixed(0),
-        spo2: +spo2.toFixed(1),
-        peso: +peso.toFixed(1),
-        bomba: peso < 100,
-        time: new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-    };
-};
+function generarLecturaSimulada(prev: Lectura): Lectura {
+  return {
+    id:            Date.now(),
+    timestamp:     new Date().toISOString(),
+    fc:            Math.max(50, Math.min(130, (prev.fc || 75) + (Math.random() - 0.5) * 6)),
+    spo2:          Math.max(85, Math.min(100, (prev.spo2 || 98) + (Math.random() - 0.5) * 2)),
+    peso:          Math.max(0, (prev.peso || 500) - Math.random() * 2),
+    bomba:         (prev.peso || 500) < 100,
+    estado_suero:  "NORMAL",
+    estado_vitales: null,
+  };
+}
 
-const construirHistorialInicial = (): Lectura[] => {
-    const arr: Lectura[] = [];
-    let r: Lectura | undefined;
-    for (let i = 0; i < MAX_HISTORIAL; i++) { r = generarLectura(r); arr.push(r); }
-    return arr;
-};
+export function useLecturas() {
+  const [live, setLive] = useState<Lectura>({
+    id: 0, timestamp: "", fc: 0, spo2: 0,
+    peso: 500, bomba: false, estado_suero: "NORMAL", estado_vitales: null
+  });
+  const [historial, setHistorial] = useState<Lectura[]>([]);
+  const [alertas, setAlertas]     = useState<Alerta[]>([]);
+  const [conectado, setConectado] = useState(false);
+  const wsRef  = useRef<WebSocket | null>(null);
+  const simRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-export const useLecturas = (simulacion = true) => {
-    const [historial, setHistorial] = useState<Lectura[]>(construirHistorialInicial);
-    const [lectura, setLectura] = useState<Lectura>(() => historial[historial.length - 1]);
-    const [conectado, setConectado] = useState(true);
-    const [alertas, setAlertas] = useState<Alerta[]>([]);
+  const cargarHistorial = useCallback(async () => {
+    try {
+      const [lects, alts] = await Promise.all([getLecturas(50), getAlertas(20)]);
+      if (lects?.length) {
+        setHistorial(lects);
+        setLive(lects[lects.length - 1]);
+      }
+      if (alts?.length) setAlertas(alts);
+    } catch (e) {
+      console.warn("Error cargando historial:", e);
+    }
+  }, []);
 
-    useEffect(() => {
-        const verificarAlertas = (r: Lectura) => {
-            const nuevas: Alerta[] = [];
-            if (r.fc < 60) nuevas.push({ id: Date.now(), msg: `FC baja: ${r.fc} bpm`, type: "warn" });
-            if (r.fc > 100) nuevas.push({ id: Date.now() + 1, msg: `FC alta: ${r.fc} bpm`, type: "warn" });
-            if (r.spo2 < 90) nuevas.push({ id: Date.now() + 2, msg: `SpO2 crítica: ${r.spo2}%`, type: "critical" });
-            else if (r.spo2 < 95) nuevas.push({ id: Date.now() + 3, msg: `SpO2 baja: ${r.spo2}%`, type: "warn" });
-            if (r.bomba) nuevas.push({ id: Date.now() + 4, msg: "Bomba peristáltica activa", type: "warn" });
-            if (r.peso < 50) nuevas.push({ id: Date.now() + 5, msg: "Fluido IV crítico", type: "critical" });
-            if (nuevas.length > 0) setAlertas(a => [...nuevas, ...a].slice(0, 20));
-        };
+  useEffect(() => {
+    if (SIMULAR) {
+      simRef.current = setInterval(() => {
+        setLive(prev => {
+          const nueva = generarLecturaSimulada(prev);
+          setHistorial(h => [...h.slice(-49), nueva]);
+          return nueva;
+        });
+      }, 1000);
+      return () => { if (simRef.current) clearInterval(simRef.current); };
+    }
 
-        const actualizar = async () => {
-            if (simulacion) {
-                const nueva = generarLectura(lectura);
-                setLectura(nueva);
-                setHistorial(h => [...h.slice(-MAX_HISTORIAL + 1), nueva]);
-                setConectado(true);
-                verificarAlertas(nueva);
-            } else {
-                try {
-                    const data = await obtenerUltimaLectura();
-                    const nueva = { ...data, time: new Date().toLocaleTimeString("es-PE") };
-                    setLectura(nueva);
-                    setHistorial(h => [...h.slice(-MAX_HISTORIAL + 1), nueva]);
-                    setConectado(true);
-                    verificarAlertas(nueva);
-                } catch {
-                    setConectado(false);
-                }
-            }
-        };
+    cargarHistorial();
 
-        const intervalo = setInterval(actualizar, 1500);
-        return () => clearInterval(intervalo);
-    }, [lectura, simulacion]);
+    function conectar() {
+      const ws = new WebSocket(API.ws);
+      wsRef.current = ws;
 
-    const limpiarAlertas = () => setAlertas([]);
+      ws.onopen = () => {
+        setConectado(true);
+        console.log("✅ WebSocket conectado a Railway");
+      };
 
-    return { lectura, historial, conectado, alertas, limpiarAlertas };
-};
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+
+          if (msg.type === "lectura" && msg.data) {
+            const nueva: Lectura = msg.data;
+            setLive(nueva);
+            setHistorial(h => [...h.slice(-49), nueva]);
+          }
+
+          if (msg.type === "alertas" && msg.data) {
+            setAlertas(a => [...msg.data, ...a].slice(0, 50));
+          }
+        } catch (e) {
+          console.warn("Error parseando WS:", e);
+        }
+      };
+
+      ws.onclose = () => {
+        setConectado(false);
+        console.warn("WebSocket cerrado, reconectando en 3s...");
+        setTimeout(conectar, 3000);
+      };
+
+      ws.onerror = (e) => {
+        console.error("WebSocket error:", e);
+        ws.close();
+      };
+    }
+
+    conectar();
+
+    return () => { wsRef.current?.close(); };
+  }, [cargarHistorial]);
+
+  return { live, historial, alertas, setAlertas, conectado };
+}

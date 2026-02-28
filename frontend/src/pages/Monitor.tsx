@@ -154,7 +154,7 @@ const Monitor = ({ lectura, historial }: Props) => {
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#1e2436" />
-                            <XAxis dataKey="time" tick={{ fontSize: 9, fill: "#374151" }} interval={9} />
+                            <XAxis dataKey="timestamp" tick={{ fontSize: 9, fill: "#374151" }} interval={9} />
                             <YAxis domain={[40, 140]} tick={{ fontSize: 9, fill: "#374151" }} />
                             <Tooltip content={<TooltipPersonalizado unit="bpm" color="#f43f5e" />} />
                             <ReferenceLine y={60} stroke="#f59e0b" strokeDasharray="4 4" strokeOpacity={0.5} />
@@ -180,7 +180,7 @@ const Monitor = ({ lectura, historial }: Props) => {
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#1e2436" />
-                            <XAxis dataKey="time" tick={{ fontSize: 9, fill: "#374151" }} interval={9} />
+                            <XAxis dataKey="timestamp" tick={{ fontSize: 9, fill: "#374151" }} interval={9} />
                             <YAxis domain={[85, 100]} tick={{ fontSize: 9, fill: "#374151" }} />
                             <Tooltip content={<TooltipPersonalizado unit="%" color="#00e5ff" />} />
                             <ReferenceLine y={95} stroke="#f59e0b" strokeDasharray="4 4" strokeOpacity={0.5} />
@@ -208,7 +208,7 @@ const Monitor = ({ lectura, historial }: Props) => {
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#1e2436" />
-                            <XAxis dataKey="time" tick={{ fontSize: 9, fill: "#374151" }} interval={9} />
+                            <XAxis dataKey="timestamp" tick={{ fontSize: 9, fill: "#374151" }} interval={9} />
                             <YAxis domain={[0, 500]} tick={{ fontSize: 9, fill: "#374151" }} />
                             <Tooltip content={<TooltipPersonalizado unit="g" color="#a78bfa" />} />
                             <ReferenceLine y={100} stroke="#f59e0b" strokeDasharray="4 4" strokeOpacity={0.6} label={{ value: "Umbral bomba", fontSize: 9, fill: "#f59e0b", position: "right" }} />

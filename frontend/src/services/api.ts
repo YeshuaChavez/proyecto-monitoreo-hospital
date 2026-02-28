@@ -1,26 +1,29 @@
-import { Lectura, Alerta } from "../tipos";
+const BASE_URL = import.meta.env.VITE_API_URL || "https://proyecto-monitoreo-hospital-production.up.railway.app";
+const WS_URL   = BASE_URL.replace("https://", "wss://").replace("http://", "ws://");
 
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-
-export const obtenerUltimaLectura = async (): Promise<Lectura> => {
-    const res = await fetch(`${BASE_URL}/lecturas/latest`);
-    if (!res.ok) throw new Error("Error al obtener lectura");
-    return res.json();
+export const API = {
+  base:      BASE_URL,
+  ws:        `${WS_URL}/ws`,
+  lecturas:  `${BASE_URL}/lecturas`,
+  alertas:   `${BASE_URL}/alertas`,
+  comandos:  `${BASE_URL}/comandos`,
 };
 
-export const obtenerLecturas = async (limite = 30): Promise<Lectura[]> => {
-    const res = await fetch(`${BASE_URL}/lecturas?limit=${limite}`);
-    if (!res.ok) throw new Error("Error al obtener historial");
-    return res.json();
-};
+export async function getLecturas(limit = 50) {
+  const res = await fetch(`${API.lecturas}?limit=${limit}`);
+  return res.json();
+}
 
-export const obtenerAlertas = async (): Promise<Alerta[]> => {
-    const res = await fetch(`${BASE_URL}/alertas`);
-    if (!res.ok) throw new Error("Error al obtener alertas");
-    return res.json();
-};
+export async function getAlertas(limit = 50) {
+  const res = await fetch(`${API.alertas}?limit=${limit}`);
+  return res.json();
+}
 
-export const limpiarAlertas = async (): Promise<void> => {
-    const res = await fetch(`${BASE_URL}/alertas`, { method: "DELETE" });
-    if (!res.ok) throw new Error("Error al limpiar alertas");
-};
+export async function enviarComando(cmd: "bomba_on" | "bomba_off" | "reset") {
+  const res = await fetch(API.comandos, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ cmd }),
+  });
+  return res.json();
+}
