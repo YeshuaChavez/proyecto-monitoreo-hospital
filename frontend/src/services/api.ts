@@ -115,3 +115,15 @@ export async function loginUsuario(usuario: string, password: string) {
   if (!res.ok) throw new Error("Credenciales incorrectas");
   return res.json();
 }
+
+export async function getSueroPorMinuto(limit = 60) {
+    const res = await fetch(`${API.base}/suero/por-minuto?limit=${limit}`);
+    if (!res.ok) return [];
+    return res.json();
+}
+
+export async function getVitalesPorMinuto(limit = 60) {
+    const res = await fetch(`${API.base}/vitales/por-minuto?limit=${limit}`);
+    if (!res.ok) return [];
+    return res.json();
+}

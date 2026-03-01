@@ -42,6 +42,7 @@ const Paciente = ({ live, alertas = [] }: Props) => {
 
   const [pacienteActual, setPacienteActual] = useState<PacienteDB | null>(null);
   const [enviando,  setEnviando]  = useState(false);
+  const [bombaLocal, setBombaLocal] = useState<boolean | null>(null); // null = usa live.bomba
   const [error,     setError]     = useState<string | null>(null);
   const [modalEmail, setModalEmail]       = useState(false);
   const [emailDest,  setEmailDest]        = useState("");
@@ -49,7 +50,7 @@ const Paciente = ({ live, alertas = [] }: Props) => {
   const [emailOk,    setEmailOk]          = useState<string | null>(null);
 
   const fluidoStatus = live.peso <= 100 ? "critical" : live.peso <= 150 ? "warn" : "ok";
-  const bombaOn      = live.bomba;
+  const bombaOn      = bombaLocal !== null ? bombaLocal : live.bomba;
   const estadoBomba  = bombaOn ? "AUTO — Bomba activa por ESP32" : "STANDBY — Bomba en espera";
   const codigoPaciente = pacienteActual
     ? (pacienteActual.codigo || `PCT-${pacienteActual.id}`)
@@ -57,9 +58,18 @@ const Paciente = ({ live, alertas = [] }: Props) => {
 
   const handleComando = async (cmd: "bomba_on" | "bomba_off") => {
     setEnviando(true); setError(null);
-    try { await enviarComando(cmd); }
-    catch { setError("Error al enviar comando. Verifica la conexión."); }
-    finally { setEnviando(false); }
+    // Estado optimista — actualiza UI inmediatamente sin esperar ESP32
+    setBombaLocal(cmd === "bomba_on");
+    try {
+      await enviarComando(cmd);
+    } catch {
+      setError("Error al enviar comando. Verifica la conexión.");
+      setBombaLocal(null); // revierte si hay error
+    } finally {
+      setEnviando(false);
+      // Después de 3s devuelve control al estado real del WebSocket
+      setTimeout(() => setBombaLocal(null), 3000);
+    }
   };
 
   const handleEnviarEmail = async () => {

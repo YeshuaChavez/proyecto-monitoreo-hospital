@@ -13,6 +13,24 @@ interface Props {
 
 type Filtro = "todas" | "vitales" | "suero";
 
+// P5 — Formatear hora desde timestamp corrigiendo zona horaria
+// El backend guarda con utcnow()-5h, pero al llegar al frontend
+// el string "2026-03-01 14:30:00" se interpreta como UTC y suma 5h
+// Solución: parsear manualmente sin conversión de zona horaria
+function formatearHora(timestamp: string): string {
+  if (!timestamp) return "--:--";
+  // Formato que llega: "2026-03-01 14:30:00" o "2026-03-01T14:30:00"
+  const limpio = timestamp.replace("T", " ").substring(0, 19);
+  const partes = limpio.split(" ");
+  if (partes.length < 2) return limpio;
+  const hora = partes[1]; // "14:30:00"
+  // Convertir a 12h
+  const [h, m, s] = hora.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12  = h % 12 || 12;
+  return `${String(h12).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")} ${ampm}`;
+}
+
 function severidad(tipo: string): "critical" | "warn" {
   return ["SUERO_CRITICO", "FC_ALTA", "FC_BAJA", "SPO2_BAJA"].includes(tipo)
     ? "critical" : "warn";
@@ -223,8 +241,9 @@ const Alertas = ({ alertas, limpiarAlertas }: Props) => {
                         </span>
                       )}
                     </div>
+                    {/* P5 — usar formatearHora(timestamp) en lugar de alerta.time */}
                     <div style={{ fontSize: 10, color: "#4b5563", fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
-                      {alerta.time} · {sev === "critical" ? "CRÍTICO — Requiere atención inmediata" : "ADVERTENCIA — Revisar paciente"}
+                      {formatearHora(alerta.timestamp)} · {sev === "critical" ? "CRÍTICO — Requiere atención inmediata" : "ADVERTENCIA — Revisar paciente"}
                     </div>
                   </div>
                 </div>

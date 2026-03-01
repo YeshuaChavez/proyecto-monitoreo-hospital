@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Alerta, EstadoLive, DatosSuero, DatosVitales } from "../tipos";
-import { API, getSuero, getVitales, getAlertas } from "../services/api";
+import { API, getSueroPorMinuto, getVitalesPorMinuto, getAlertas } from "../services/api";
 
 const SIMULAR = false;
-
-
 
 export function useLecturas() {
   const [live, setLive] = useState<EstadoLive>({
@@ -30,21 +28,35 @@ export function useLecturas() {
     ultimosVitalesRef.current = { fc:0, spo2:0, estado_vitales:"MIDIENDO" };
   }, []);
 
+  // Carga historial agrupado por minuto
   const cargarHistorial = useCallback(async () => {
     try {
       const [suero, vitales, alts] = await Promise.all([
-        getSuero(60), getVitales(60), getAlertas(50),
+        getSueroPorMinuto(60),    // ← por minuto
+        getVitalesPorMinuto(60),  // ← por minuto
+        getAlertas(50),
       ]);
-      if (suero?.length)   { setHistorialSuero(suero); setLive(l => ({ ...l, ...suero[suero.length-1] })); }
+      if (suero?.length) {
+        setHistorialSuero(suero);
+        setLive(l => ({ ...l, ...suero[suero.length - 1] }));
+      }
       if (vitales?.length) {
         setHistorialVitales(vitales);
-        const ultimo = vitales[vitales.length-1];
+        const ultimo = vitales[vitales.length - 1];
         ultimosVitalesRef.current = { fc: ultimo.fc, spo2: ultimo.spo2, estado_vitales: ultimo.estado_vitales };
         setLive(l => ({ ...l, fc: ultimo.fc, spo2: ultimo.spo2, estado_vitales: ultimo.estado_vitales }));
       }
       if (alts?.length) setAlertas(alts);
     } catch (e) { console.warn("Error cargando historial:", e); }
   }, []);
+
+  // Recarga el historial por minuto cada 60 segundos
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      cargarHistorial();
+    }, 60_000);
+    return () => clearInterval(intervalo);
+  }, [cargarHistorial]);
 
   useEffect(() => {
     if (SIMULAR) return;
@@ -66,22 +78,35 @@ export function useLecturas() {
             return;
           }
 
+          // Lectura de suero → solo actualiza live, NO el historial
+          // El historial se recarga cada 60s agrupado por minuto
           if (msg.type === "lectura" && msg.data) {
             const suero: DatosSuero = msg.data;
             const vRef = ultimosVitalesRef.current;
-            const fc    = (msg.estado?.fc    && msg.estado.fc    > 0) ? msg.estado.fc    : vRef.fc;
-            const spo2  = (msg.estado?.spo2  && msg.estado.spo2  > 0) ? msg.estado.spo2  : vRef.spo2;
-            const ev    = msg.estado?.estado_vitales || vRef.estado_vitales;
-            setLive({ fc, spo2, peso: suero.peso, bomba: suero.bomba, estado_suero: suero.estado_suero, estado_vitales: ev });
-            setHistorialSuero(h => [...h.slice(-59), suero]);
+            const fc   = (msg.estado?.fc   && msg.estado.fc   > 0) ? msg.estado.fc   : vRef.fc;
+            const spo2 = (msg.estado?.spo2 && msg.estado.spo2 > 0) ? msg.estado.spo2 : vRef.spo2;
+            const ev   = msg.estado?.estado_vitales || vRef.estado_vitales;
+            setLive({
+              fc, spo2,
+              peso:          suero.peso,
+              bomba:         suero.bomba,
+              estado_suero:  suero.estado_suero,
+              estado_vitales: ev,
+            });
+            // ← historialSuero NO se toca aquí, solo live
           }
 
+          // Vitales → solo actualiza live, NO el historial
           if (msg.type === "vitales" && msg.data) {
             const vitales: DatosVitales = msg.data;
             if (vitales.fc > 0 && vitales.spo2 > 0) {
-              ultimosVitalesRef.current = { fc: vitales.fc, spo2: vitales.spo2, estado_vitales: vitales.estado_vitales };
+              ultimosVitalesRef.current = {
+                fc:             vitales.fc,
+                spo2:           vitales.spo2,
+                estado_vitales: vitales.estado_vitales,
+              };
               setLive(l => ({ ...l, fc: vitales.fc, spo2: vitales.spo2, estado_vitales: vitales.estado_vitales }));
-              setHistorialVitales(h => [...h.slice(-59), vitales]);
+              // ← historialVitales NO se toca aquí, solo live
             }
           }
 
