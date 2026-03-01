@@ -9,7 +9,14 @@ import "./index.css";
 
 function App() {
   const [tab, setTab] = useState("paciente");
-  const { live: lectura, historial, conectado, alertas, setAlertas } = useLecturas();
+  const {
+    live,
+    historialSuero,
+    historialVitales,
+    conectado,
+    alertas,
+    setAlertas,
+  } = useLecturas();
 
   return (
     <div style={{
@@ -27,10 +34,10 @@ function App() {
       <BarraNavegacion tab={tab} setTab={setTab} alertas={alertas} conectado={conectado} />
 
       <main style={{ position: "relative", zIndex: 1, padding: "28px 32px", maxWidth: 1400, margin: "0 auto" }}>
-        {tab === "overview" && <Monitor lectura={lectura} historial={historial} />}
-        {tab === "analytics" && <Analytics lectura={lectura} historial={historial} />}
-        {tab === "paciente" && <Paciente lectura={lectura} />}
-        {tab === "alertas" && <Alertas alertas={alertas} limpiarAlertas={() => setAlertas([])} />}
+        {tab === "overview"   && <Monitor   live={live} historialSuero={historialSuero} historialVitales={historialVitales} />}
+        {tab === "analytics"  && <Analytics live={live} historialVitales={historialVitales} />}
+        {tab === "paciente"   && <Paciente  live={live} />}
+        {tab === "alertas"    && <Alertas   alertas={alertas} limpiarAlertas={() => setAlertas([])} />}
       </main>
 
       <footer style={{
@@ -40,10 +47,10 @@ function App() {
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
         <span style={{ fontSize: 10, color: "#1f2937", fontFamily: "'JetBrains Mono', monospace" }}>
-          UNMSM · FISI · INTERNET DE LAS COSAS · 2026
+          Monitoreo en Tiempo Real de Pacientes
         </span>
         <span style={{ fontSize: 10, color: "#1f2937", fontFamily: "'JetBrains Mono', monospace" }}>
-          ESP32 + MAX30102 + HX711 + BOMBA PERISTÁLTICA
+          Internet de las Cosas - Proyecto Final
         </span>
       </footer>
     </div>

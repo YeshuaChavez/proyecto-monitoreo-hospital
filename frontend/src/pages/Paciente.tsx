@@ -2,14 +2,14 @@ import { useState } from "react";
 import InsigniaAlerta from "../components/InsigniaAlerta";
 import BarraFluido from "../components/BarraFluido";
 import EscenaPaciente from "../components/EscenaPaciente";
-import { PacienteInfo, Lectura } from "../tipos";
+import { PacienteInfo, EstadoLive } from "../tipos";
 import { enviarComando, enviarEmail } from "../services/api";
 
-interface Props { lectura: Lectura; }
+interface Props { live: EstadoLive; }
 
 const datosIniciales: PacienteInfo = {
   nombre: "Juan Carlos", apellido: "Rodriguez Gomez",
-  id: "PCT-2026-0042", cama: "04", doctor: "Dr. Paredes Villanueva",
+  id: "PCT-2026-0042", cama: "01", doctor: "Dr. Paredes Villanueva",
   grupoSanguineo: "O+", fechaNacimiento: "15-03-1975",
   fechaIngreso: "20-02-2026", direccion: "Av. Universitaria 1801, Lima",
   contactoNombre: "María Vilchez", contactoTelefono: "987 654 321",
@@ -31,8 +31,8 @@ const TopBar = ({ color }: { color: string }) => (
   <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${color},transparent)` }}/>
 );
 
-const Paciente = ({ lectura }: Props) => {
-  if (!lectura) return null;
+const Paciente = ({ live }: Props) => {
+  if (!live) return null;
 
   const [paciente, setPaciente] = useState<PacienteInfo>(datosIniciales);
   const [editando, setEditando]   = useState(false);
@@ -40,7 +40,6 @@ const Paciente = ({ lectura }: Props) => {
   const [enviando, setEnviando]   = useState(false);
   const [error, setError]         = useState<string | null>(null);
 
-  // Estados modal email
   const [modalEmail, setModalEmail]       = useState(false);
   const [emailDest, setEmailDest]         = useState("");
   const [enviandoEmail, setEnviandoEmail] = useState(false);
@@ -49,9 +48,9 @@ const Paciente = ({ lectura }: Props) => {
   const guardar  = () => { setPaciente(temp); setEditando(false); };
   const cancelar = () => { setTemp(paciente); setEditando(false); };
 
-  const fluidoStatus = lectura.peso < 50 ? "critical" : lectura.peso < 100 ? "warn" : "ok";
-  const bombaOn = lectura.bomba;
-  const estadoBomba = bombaOn ? "AUTO — Bomba activa por ESP32" : "STANDBY — Bomba en espera";
+  const fluidoStatus = live.peso < 50 ? "critical" : live.peso < 100 ? "warn" : "ok";
+  const bombaOn      = live.bomba;
+  const estadoBomba  = bombaOn ? "AUTO — Bomba activa por ESP32" : "STANDBY — Bomba en espera";
 
   const handleComando = async (cmd: "bomba_on" | "bomba_off") => {
     setEnviando(true);
@@ -70,7 +69,7 @@ const Paciente = ({ lectura }: Props) => {
     setEnviandoEmail(true);
     setEmailOk(null);
     try {
-      await enviarEmail(emailDest, lectura, []);
+      await enviarEmail(emailDest, live, []);
       setEmailOk("✅ Correo enviado correctamente");
       setTimeout(() => { setModalEmail(false); setEmailOk(null); setEmailDest(""); }, 2000);
     } catch {
@@ -94,7 +93,7 @@ const Paciente = ({ lectura }: Props) => {
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Ficha del Paciente</h2>
           <p style={{ fontSize: 11, color: "#4b5563", margin: "3px 0 0", fontFamily: "'JetBrains Mono', monospace" }}>
-            {paciente.id} · Cama {paciente.cama} · UCI
+            {paciente.id} · Consultorio General · Posta Médica
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -120,7 +119,7 @@ const Paciente = ({ lectura }: Props) => {
           <div style={{ position: "absolute", top: 11, left: 14, zIndex: 2, fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "rgba(0,200,255,0.38)", letterSpacing: "0.18em" }}>
             VISUALIZACIÓN EN TIEMPO REAL · ESP32
           </div>
-          <EscenaPaciente lectura={lectura} />
+          <EscenaPaciente lectura={live} />
         </div>
 
         {/* Columna derecha */}
@@ -133,13 +132,13 @@ const Paciente = ({ lectura }: Props) => {
               <div style={{ width: 42, height: 42, borderRadius: "50%", background: "linear-gradient(135deg,#1e2436,#2d3748)", border: "2px solid rgba(0,229,255,0.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, flexShrink: 0 }}>👤</div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#f1f5f9", lineHeight: 1.3 }}>{paciente.nombre} {paciente.apellido}</div>
-                <InsigniaAlerta label={`Cama ${paciente.cama}`} type="ok"/>
+                <InsigniaAlerta label={`Consultorio ${paciente.cama}`} type="ok"/>
               </div>
             </div>
             <SeccionLabel color="#00e5ff">DATOS PERSONALES</SeccionLabel>
             {editando ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {([["Nombre","nombre"],["Apellido","apellido"],["ID","id"],["Cama","cama"],["Doctor","doctor"],["Grupo Sanguíneo","grupoSanguineo"],["Fecha Nac.","fechaNacimiento"],["Fecha Ingreso","fechaIngreso"],["Dirección","direccion"]] as [string, keyof PacienteInfo][]).map(([l,k]) => (
+                {([["Nombre","nombre"],["Apellido","apellido"],["ID","id"],["Consultorio","cama"],["Doctor","doctor"],["Grupo Sanguíneo","grupoSanguineo"],["Fecha Nac.","fechaNacimiento"],["Fecha Ingreso","fechaIngreso"],["Dirección","direccion"]] as [string, keyof PacienteInfo][]).map(([l,k]) => (
                   <div key={k}>
                     <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 2 }}>{l}</div>
                     <input style={inp} value={temp[k]} onChange={e => setTemp(p => ({ ...p, [k]: e.target.value }))}/>
@@ -182,8 +181,6 @@ const Paciente = ({ lectura }: Props) => {
               <>
                 <Campo label="Teléfono" valor={paciente.contactoTelefono}/>
                 <Campo label="Relación" valor={paciente.contactoRelacion}/>
-
-                {/* Botón enviar reporte — debajo del contacto familiar */}
                 <div style={{ marginTop: 14 }}>
                   <button
                     onClick={() => setModalEmail(true)}
@@ -214,10 +211,10 @@ const Paciente = ({ lectura }: Props) => {
                 <span style={{ fontSize: 11, color: "#9ca3af" }}>Nivel actual</span>
                 <InsigniaAlerta label={fluidoStatus === "ok" ? "Normal" : fluidoStatus === "warn" ? "Bajo" : "Crítico"} type={fluidoStatus}/>
               </div>
-              <BarraFluido peso={lectura.peso}/>
+              <BarraFluido peso={live.peso}/>
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
                 <span style={{ fontSize: 9, color: "#374151", fontFamily: "'JetBrains Mono', monospace" }}>0g</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", fontFamily: "'JetBrains Mono', monospace" }}>{lectura.peso.toFixed(1)} g</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", fontFamily: "'JetBrains Mono', monospace" }}>{live.peso.toFixed(1)} g</span>
                 <span style={{ fontSize: 9, color: "#374151", fontFamily: "'JetBrains Mono', monospace" }}>500g</span>
               </div>
               <div style={{ marginTop: 7, fontSize: 10, color: "#4b5563", display: "flex", gap: 12 }}>
@@ -226,7 +223,6 @@ const Paciente = ({ lectura }: Props) => {
               </div>
             </div>
 
-            {/* Botones control */}
             <div style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", marginBottom: 8, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.08em" }}>CONTROL MANUAL REMOTO</div>
             <div style={{ display: "flex", gap: 7 }}>
               <button
@@ -257,14 +253,12 @@ const Paciente = ({ lectura }: Props) => {
               </button>
             </div>
 
-            {/* Error */}
             {error && (
               <div style={{ marginTop: 8, fontSize: 10, color: "#ef4444", fontFamily: "'JetBrains Mono', monospace" }}>
                 ⚠ {error}
               </div>
             )}
 
-            {/* Estado */}
             <div style={{
               marginTop: 10, padding: "7px 11px",
               background: bombaOn ? "rgba(245,158,11,0.07)" : "rgba(16,185,129,0.07)",
@@ -276,11 +270,10 @@ const Paciente = ({ lectura }: Props) => {
               {estadoBomba}
             </div>
           </div>
-
         </div>
       </div>
 
-      {/* ── Modal Email ── */}
+      {/* Modal Email */}
       {modalEmail && (
         <div style={{
           position: "fixed", inset: 0, zIndex: 999,
@@ -293,13 +286,11 @@ const Paciente = ({ lectura }: Props) => {
             borderRadius: 16, padding: 28,
             width: 400, position: "relative",
           }}>
-            {/* Top bar verde */}
             <div style={{
               position: "absolute", top: 0, left: 0, right: 0, height: 2,
               background: "linear-gradient(90deg,transparent,#10b981,transparent)",
               borderRadius: "16px 16px 0 0",
             }}/>
-
             <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 6px", color: "#f1f5f9" }}>
               📧 Enviar reporte por correo
             </h3>
@@ -307,7 +298,6 @@ const Paciente = ({ lectura }: Props) => {
               Se enviará el reporte del paciente con PDF adjunto
             </p>
 
-            {/* Input email */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 6, fontFamily: "'JetBrains Mono', monospace" }}>
                 CORREO DESTINATARIO
@@ -328,7 +318,6 @@ const Paciente = ({ lectura }: Props) => {
               />
             </div>
 
-            {/* Info del paciente */}
             <div style={{
               background: "rgba(0,229,255,0.04)",
               border: "1px solid rgba(0,229,255,0.1)",
@@ -338,13 +327,12 @@ const Paciente = ({ lectura }: Props) => {
             }}>
               <div>Paciente: <span style={{ color: "#e2e8f0" }}>{paciente.nombre} {paciente.apellido}</span></div>
               <div>
-                FC: <span style={{ color: "#f43f5e" }}>{lectura.fc > 0 ? lectura.fc + " bpm" : "--"}</span>
-                {"  "}SpO2: <span style={{ color: "#00e5ff" }}>{lectura.spo2 > 0 ? lectura.spo2 + "%" : "--"}</span>
-                {"  "}IV: <span style={{ color: "#a78bfa" }}>{lectura.peso.toFixed(1)}g</span>
+                FC: <span style={{ color: "#f43f5e" }}>{live.fc > 0 ? live.fc + " bpm" : "--"}</span>
+                {"  "}SpO2: <span style={{ color: "#00e5ff" }}>{live.spo2 > 0 ? live.spo2 + "%" : "--"}</span>
+                {"  "}IV: <span style={{ color: "#a78bfa" }}>{live.peso.toFixed(1)}g</span>
               </div>
             </div>
 
-            {/* Resultado */}
             {emailOk && (
               <div style={{
                 marginBottom: 12, fontSize: 12, fontWeight: 600,
@@ -355,7 +343,6 @@ const Paciente = ({ lectura }: Props) => {
               </div>
             )}
 
-            {/* Botones */}
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={handleEnviarEmail}
@@ -383,11 +370,9 @@ const Paciente = ({ lectura }: Props) => {
                 Cancelar
               </button>
             </div>
-
           </div>
         </div>
       )}
-
     </div>
   );
 };

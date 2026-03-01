@@ -30,8 +30,8 @@ const BarraNavegacion = ({ tab, setTab, alertas, conectado }: Props) => {
                     </svg>
                 </div>
                 <div>
-                    <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.3px", color: "#f1f5f9" }}>
-                        Sistema de Monitoreo de Entorno Hospitalario
+                    <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.3px", color: "#f1f5f9" }}>
+                        Sistema de Monitoreo - Posta Médica
                     </div>
                 </div>
             </div>
