@@ -29,15 +29,18 @@ MQTT_CLIENT = os.environ.get("MQTT_CLIENT", "FastAPI_Backend")
 TOPIC_LECTURAS = "posta/consultorio/lecturas"
 TOPIC_VITALES  = "posta/consultorio/vitales"
 TOPIC_COMANDOS = "posta/consultorio/comandos"
-TOPIC_CONFIG = "posta/consultorio/config"
+TOPIC_CONFIG   = "posta/consultorio/config"
 
 # ── Umbrales alertas ──────────────────────────────────────────
-UMBRAL_FC_ALTA       = 100
-UMBRAL_FC_BAJA       = 60
-UMBRAL_SPO2          = 95
+UMBRAL_FC_ALTA = 100
+UMBRAL_FC_BAJA = 60
+UMBRAL_SPO2    = 95
 
 # ── Anti-spam Telegram ────────────────────────────────────────
 INTERVALO_TELEGRAM = 15
+
+# ── Estados donde NO se generan alertas ──────────────────────
+ESTADOS_INACTIVOS = {"INICIANDO", "ESPERANDO"}
 
 
 class MQTTManager:
@@ -49,14 +52,14 @@ class MQTTManager:
         self._ultimo_suero: dict = {
             "peso":         999.0,
             "bomba":        False,
-            "estado_suero": "NORMAL",
+            "estado_suero": "ESPERANDO",
         }
         self._ultimos_vitales: dict = {
             "fc":             0,
             "spo2":           0,
             "estado_vitales": "MIDIENDO",
         }
-        self.ultimo_origen: str = "automatico"
+        self.ultimo_origen: str  = "automatico"
         self._paciente_activo: dict | None = None
 
     # ── Guardar en tabla suero ────────────────────────────────
@@ -68,12 +71,11 @@ class MQTTManager:
                 peso           = peso,
                 bomba          = bomba,
                 estado_suero   = estado_suero,
-                origen_comando = self.ultimo_origen if bomba else None,  # solo guarda si bomba=true
+                origen_comando = self.ultimo_origen if bomba else None,
             )
             db.add(registro)
             db.commit()
             db.refresh(registro)
-            # Resetear origen después de guardar
             if bomba:
                 self.ultimo_origen = "automatico"
             return registro
@@ -98,8 +100,13 @@ class MQTTManager:
             db.close()
 
     # ── Alertas de suero ──────────────────────────────────────
-    def _alertas_suero(self, peso: float, bomba: bool) -> list:
-        cfg = get_config()  # ← lee de BD cada vez
+    def _alertas_suero(self, peso: float, bomba: bool, estado_suero: str) -> list:
+        # No generar alertas si el sistema está esperando bolsa
+        if estado_suero in ESTADOS_INACTIVOS:
+            print(f"⏸️  Alertas suero omitidas — estado: {estado_suero}")
+            return []
+
+        cfg = get_config()
         umbral_alerta  = cfg["peso_alerta"]
         umbral_critico = cfg["peso_critico"]
 
@@ -134,6 +141,15 @@ class MQTTManager:
 
     # ── Alertas de vitales ────────────────────────────────────
     def _alertas_vitales(self, fc: int, spo2: int) -> list:
+        # No generar alertas si el suero no está activo todavía
+        if self._ultimo_suero.get("estado_suero") in ESTADOS_INACTIVOS:
+            print(f"⏸️  Alertas vitales omitidas — suero: {self._ultimo_suero.get('estado_suero')}")
+            return []
+
+        # No generar alertas con valores inválidos (sin dedo en sensor)
+        if fc == 0 and spo2 == 0:
+            return []
+
         db = SessionLocal()
         try:
             alertas = []
@@ -163,13 +179,12 @@ class MQTTManager:
         finally:
             db.close()
 
-    #─ Paciente activo (para mostrar en Telegram) ─────────────────
+    # ── Paciente activo (para Telegram) ──────────────────────
     def set_paciente_activo(self, paciente: dict | None):
         self._paciente_activo = paciente
 
-    # ── Publicar configuración al ESP32 ─────────────────────────
+    # ── Publicar configuración al ESP32 ──────────────────────
     async def publicar_config(self, peso_alerta: float, peso_critico: float):
-        """Publica nuevos umbrales al ESP32 por MQTT."""
         payload = json.dumps({
             "peso_alerta":  peso_alerta,
             "peso_critico": peso_critico,
@@ -186,16 +201,17 @@ class MQTTManager:
             restante = int(INTERVALO_TELEGRAM - (ahora - self._ultimo_telegram).total_seconds())
             print(f"📱 Telegram anti-spam ({restante}s restantes)")
             return
-        mensaje, tipos = construir_mensaje(payload_completo, alertas, self._paciente_activo)  # ← aquí
+        mensaje, tipos = construir_mensaje(payload_completo, alertas, self._paciente_activo)
         if mensaje:
             await enviar_alerta(mensaje, tipos)
             self._ultimo_telegram = ahora
+            print("📱 Notificación Telegram enviada")
 
     # ── Handler: lecturas → tabla suero ──────────────────────
     async def _procesar_lecturas(self, payload: dict, ws_manager):
         peso         = payload.get("peso",   999.0)
         bomba        = payload.get("bomba",  False)
-        estado_suero = payload.get("estado", "NORMAL")
+        estado_suero = payload.get("estado", "ESPERANDO")
 
         self._ultimo_suero = {
             "peso":         peso,
@@ -212,7 +228,8 @@ class MQTTManager:
             "estado": payload_completo,
         })
 
-        alertas = self._alertas_suero(peso, bomba)
+        # Pasa estado_suero para filtrar alertas
+        alertas = self._alertas_suero(peso, bomba, estado_suero)
         if alertas:
             await ws_manager.broadcast({"type": "alertas", "data": alertas})
             await self._enviar_telegram_si_aplica(payload_completo, alertas)
@@ -255,13 +272,13 @@ class MQTTManager:
                 tls = ssl.create_default_context()
 
                 async with aiomqtt.Client(
-                    hostname   = MQTT_HOST,
-                    port       = MQTT_PORT,
-                    username   = MQTT_USER,
-                    password   = MQTT_PASS,
-                    identifier = MQTT_CLIENT,
-                    tls_context= tls,
-                    keepalive  = 30,
+                    hostname    = MQTT_HOST,
+                    port        = MQTT_PORT,
+                    username    = MQTT_USER,
+                    password    = MQTT_PASS,
+                    identifier  = MQTT_CLIENT,
+                    tls_context = tls,
+                    keepalive   = 30,
                 ) as client:
                     self._client = client
                     print("✅ MQTT conectado")
