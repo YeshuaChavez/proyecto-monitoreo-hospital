@@ -16,8 +16,8 @@ if DATABASE_URL.startswith("mysql://"):
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,        # reconecta si MySQL cerró la conexión
-    pool_recycle=3600,         # recicla conexiones cada 1h
+    pool_pre_ping=True,   # reconecta si MySQL cerró la conexión
+    pool_recycle=3600,    # recicla conexiones cada 1h
     pool_size=5,
     max_overflow=10,
     echo=False,
@@ -29,7 +29,7 @@ Base = declarative_base()
 
 
 def init_db():
-    """Crea las tablas si no existen."""
-    from models import Lectura, Alerta   # import aquí para evitar circular
+    from models import Suero, Vitales, Alerta
+    Base.metadata.drop_all(bind=engine)   # ← solo esta vez
     Base.metadata.create_all(bind=engine)
     print("✅ Base de datos inicializada")

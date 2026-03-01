@@ -1,12 +1,8 @@
 """
 MQTTManager:
-  - hospital/cama04/lecturas  → peso + bomba + estado_suero  (cada 1s)
-  - hospital/cama04/vitales   → fc + spo2 + estado_vitales   (cada 10s, promediado)
+  - hospital/cama04/lecturas  → peso + bomba + estado_suero  (cada 1s)  → tabla suero
+  - hospital/cama04/vitales   → fc + spo2 + estado_vitales   (cada 10s) → tabla vitales
   - hospital/cama04/comandos  → publica comandos al ESP32
-
-  Cada topic actualiza SOLO lo que le corresponde en MySQL.
-  Las alertas de suero se detectan desde lecturas.
-  Las alertas de signos vitales se detectan desde vitales.
 """
 
 import asyncio
@@ -18,7 +14,7 @@ from datetime import datetime, timedelta
 import aiomqtt
 
 from database import SessionLocal
-from models import Lectura, Alerta
+from models import Suero, Vitales, Alerta
 from telegram_bot import enviar_alerta, construir_mensaje
 
 # ── Credenciales HiveMQ ───────────────────────────────────────
@@ -39,21 +35,20 @@ UMBRAL_SPO2          = 95
 UMBRAL_SUERO_ALERTA  = 150.0
 UMBRAL_SUERO_CRITICO = 100.0
 
-# ── Anti-spam Telegram — mínimo 15s entre notificaciones ──────
+# ── Anti-spam Telegram ────────────────────────────────────────
 INTERVALO_TELEGRAM = 15
 
 
 class MQTTManager:
     def __init__(self):
-        self._client             = None
-        self._cola_comandos      = asyncio.Queue()
-        self._ultimo_telegram    = datetime.min
+        self._client          = None
+        self._cola_comandos   = asyncio.Queue()
+        self._ultimo_telegram = datetime.min
 
-        # Estado compartido entre topics para construir
-        # el payload completo al hacer broadcast
+        # Estado compartido para broadcast completo al dashboard
         self._ultimo_suero: dict = {
-            "peso":  999.0,
-            "bomba": False,
+            "peso":         999.0,
+            "bomba":        False,
             "estado_suero": "NORMAL",
         }
         self._ultimos_vitales: dict = {
@@ -62,32 +57,41 @@ class MQTTManager:
             "estado_vitales": "MIDIENDO",
         }
 
-    # ── Guardar lectura en MySQL ───────────────────────────────
-    def _guardar_lectura(self, campos: dict) -> Lectura:
-        """
-        Inserta solo los campos recibidos.
-        Los campos que no vienen quedan en None (SQL NULL).
-        """
+    # ── Guardar en tabla suero ────────────────────────────────
+    def _guardar_suero(self, peso: float, bomba: bool, estado_suero: str) -> Suero:
         db = SessionLocal()
         try:
-            lectura = Lectura(
-                timestamp      = datetime.utcnow() - timedelta(hours=5),
-                fc             = campos.get("fc"),
-                spo2           = campos.get("spo2"),
-                peso           = campos.get("peso"),
-                bomba          = campos.get("bomba"),
-                estado_suero   = campos.get("estado_suero"),
-                estado_vitales = campos.get("estado_vitales"),
-                topic          = campos.get("topic"),
+            registro = Suero(
+                timestamp    = datetime.utcnow() - timedelta(hours=5),
+                peso         = peso,
+                bomba        = bomba,
+                estado_suero = estado_suero,
             )
-            db.add(lectura)
+            db.add(registro)
             db.commit()
-            db.refresh(lectura)
-            return lectura
+            db.refresh(registro)
+            return registro
         finally:
             db.close()
 
-    # ── Detectar y guardar alertas de SUERO ───────────────────
+    # ── Guardar en tabla vitales ──────────────────────────────
+    def _guardar_vitales(self, fc: int, spo2: int, estado_vitales: str) -> Vitales:
+        db = SessionLocal()
+        try:
+            registro = Vitales(
+                timestamp      = datetime.utcnow() - timedelta(hours=5),
+                fc             = fc,
+                spo2           = spo2,
+                estado_vitales = estado_vitales,
+            )
+            db.add(registro)
+            db.commit()
+            db.refresh(registro)
+            return registro
+        finally:
+            db.close()
+
+    # ── Alertas de suero ──────────────────────────────────────
     def _alertas_suero(self, peso: float, bomba: bool) -> list:
         db = SessionLocal()
         try:
@@ -122,7 +126,7 @@ class MQTTManager:
         finally:
             db.close()
 
-    # ── Detectar y guardar alertas de SIGNOS VITALES ──────────
+    # ── Alertas de vitales ────────────────────────────────────
     def _alertas_vitales(self, fc: int, spo2: int) -> list:
         db = SessionLocal()
         try:
@@ -173,87 +177,65 @@ class MQTTManager:
             self._ultimo_telegram = ahora
             print("📱 Notificación Telegram enviada")
 
-    # ── Handler: topic lecturas (peso + bomba cada 1s) ─────────
+    # ── Handler: lecturas → tabla suero ──────────────────────
     async def _procesar_lecturas(self, payload: dict, ws_manager):
-        peso  = payload.get("peso",  999.0)
-        bomba = payload.get("bomba", False)
+        peso         = payload.get("peso",   999.0)
+        bomba        = payload.get("bomba",  False)
         estado_suero = payload.get("estado", "NORMAL")
 
-        # Actualizar estado compartido
         self._ultimo_suero = {
-            "peso":        peso,
-            "bomba":       bomba,
+            "peso":         peso,
+            "bomba":        bomba,
             "estado_suero": estado_suero,
         }
 
-        # Guardar en MySQL solo campos de suero
-        lectura = self._guardar_lectura({
-            "peso":        peso,
-            "bomba":       bomba,
-            "estado_suero": estado_suero,
-            "topic":       TOPIC_LECTURAS,
-        })
+        registro = self._guardar_suero(peso, bomba, estado_suero)
 
-        # Broadcast al dashboard con estado completo
-        payload_completo = {
-            **self._ultimo_suero,
-            **self._ultimos_vitales,
-        }
+        payload_completo = {**self._ultimo_suero, **self._ultimos_vitales}
+
         await ws_manager.broadcast({
-            "type":    "lectura",
-            "data":    lectura.to_dict(),
-            "estado":  payload_completo,
+            "type":   "lectura",
+            "data":   registro.to_dict(),
+            "estado": payload_completo,
         })
 
-        # Alertas de suero
         alertas = self._alertas_suero(peso, bomba)
         if alertas:
             await ws_manager.broadcast({"type": "alertas", "data": alertas})
             await self._enviar_telegram_si_aplica(payload_completo, alertas)
 
-    # ── Handler: topic vitales (fc + spo2 cada 10s, promediado) ─
+    # ── Handler: vitales → tabla vitales ─────────────────────
     async def _procesar_vitales(self, payload: dict, ws_manager):
         fc             = payload.get("fc",     0)
         spo2           = payload.get("spo2",   0)
         estado_vitales = payload.get("estado", "NORMAL")
 
-        # Actualizar estado compartido
         self._ultimos_vitales = {
             "fc":             fc,
             "spo2":           spo2,
             "estado_vitales": estado_vitales,
         }
 
-        # Guardar en MySQL solo campos de signos vitales
-        lectura = self._guardar_lectura({
-            "fc":             fc,
-            "spo2":           spo2,
-            "estado_vitales": estado_vitales,
-            "topic":          TOPIC_VITALES,
-        })
+        registro = self._guardar_vitales(fc, spo2, estado_vitales)
 
-        # Broadcast al dashboard con estado completo
-        payload_completo = {
-            **self._ultimo_suero,
-            **self._ultimos_vitales,
-        }
+        payload_completo = {**self._ultimo_suero, **self._ultimos_vitales}
+
         await ws_manager.broadcast({
             "type":   "vitales",
-            "data":   lectura.to_dict(),
+            "data":   registro.to_dict(),
             "estado": payload_completo,
         })
 
-        # Alertas de signos vitales (solo con valores promediados)
         alertas = self._alertas_vitales(fc, spo2)
         if alertas:
             await ws_manager.broadcast({"type": "alertas", "data": alertas})
             await self._enviar_telegram_si_aplica(payload_completo, alertas)
 
-    # ── Publicar comando al ESP32 ──────────────────────────────
+    # ── Publicar comando al ESP32 ─────────────────────────────
     async def publicar_comando(self, cmd: str):
         await self._cola_comandos.put(cmd)
 
-    # ── Loop principal MQTT ────────────────────────────────────
+    # ── Loop principal MQTT ───────────────────────────────────
     async def start(self, ws_manager):
         while True:
             try:
@@ -261,13 +243,13 @@ class MQTTManager:
                 tls = ssl.create_default_context()
 
                 async with aiomqtt.Client(
-                    hostname  = MQTT_HOST,
-                    port      = MQTT_PORT,
-                    username  = MQTT_USER,
-                    password  = MQTT_PASS,
-                    identifier= MQTT_CLIENT,
-                    tls_context=tls,
-                    keepalive = 30,
+                    hostname   = MQTT_HOST,
+                    port       = MQTT_PORT,
+                    username   = MQTT_USER,
+                    password   = MQTT_PASS,
+                    identifier = MQTT_CLIENT,
+                    tls_context= tls,
+                    keepalive  = 30,
                 ) as client:
                     self._client = client
                     print("✅ MQTT conectado")
@@ -286,7 +268,7 @@ class MQTTManager:
             print("🔄 Reconectando MQTT en 5s...")
             await asyncio.sleep(5)
 
-    # ── Recibir y rutear mensajes por topic ───────────────────
+    # ── Recibir y rutear por topic ────────────────────────────
     async def _recibir(self, client, ws_manager):
         async for msg in client.messages:
             topic       = str(msg.topic)
@@ -302,16 +284,12 @@ class MQTTManager:
 
             if topic == TOPIC_LECTURAS:
                 await self._procesar_lecturas(payload, ws_manager)
-
             elif topic == TOPIC_VITALES:
                 await self._procesar_vitales(payload, ws_manager)
 
-            # TOPIC_COMANDOS no se procesa aquí, lo maneja el ESP32
-
-    # ── Enviar comandos encolados ──────────────────────────────
+    # ── Enviar comandos encolados ─────────────────────────────
     async def _enviar_comandos(self, client):
         while True:
             cmd = await self._cola_comandos.get()
-            payload = json.dumps({"cmd": cmd})
-            await client.publish(TOPIC_COMANDOS, payload, qos=1)
+            await client.publish(TOPIC_COMANDOS, json.dumps({"cmd": cmd}), qos=1)
             print(f"📤 Comando enviado: {cmd}")

@@ -3,11 +3,6 @@
  MONITOR IoT HOSPITALARIO — Backend FastAPI
  UNMSM FISI 2026
 =============================================================
- Flujo:
-   ESP32 → MQTT (HiveMQ) → este servidor → MySQL
-                                         → WebSocket (Vercel)
-   Vercel → REST API → este servidor → MQTT → ESP32
-=============================================================
 """
 
 import asyncio
@@ -16,22 +11,19 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-import aiomqtt
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import text
 
-from database import engine, SessionLocal, init_db
-from models import Lectura, Alerta
+from database import SessionLocal, init_db
+from models import Suero, Vitales, Alerta
 from mqtt_client import MQTTManager
-
 from telegram_bot import polling
 
 # ── Singleton MQTT ────────────────────────────────────────────
 mqtt_manager = MQTTManager()
 
-# ── WebSocket manager ────────────────────────────────────────
+# ── WebSocket manager ─────────────────────────────────────────
 class ConnectionManager:
     def __init__(self):
         self.active: list[WebSocket] = []
@@ -45,7 +37,7 @@ class ConnectionManager:
             self.active.remove(ws)
 
     async def broadcast(self, data: dict):
-        msg = json.dumps(data, default=str)
+        msg  = json.dumps(data, default=str)
         dead = []
         for ws in self.active:
             try:
@@ -57,12 +49,12 @@ class ConnectionManager:
 
 ws_manager = ConnectionManager()
 
-# ── Lifespan ─────────────────────────────────────────────────
+# ── Lifespan ──────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     task_mqtt     = asyncio.create_task(mqtt_manager.start(ws_manager))
-    task_telegram = asyncio.create_task(polling())  
+    task_telegram = asyncio.create_task(polling())
     yield
     task_mqtt.cancel()
     task_telegram.cancel()
@@ -81,32 +73,43 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # En producción: ["https://tu-app.vercel.app"]
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ═══════════════════════════════════════════════════════════════
-#  WEBSOCKET — dashboard se conecta aquí
+#  WEBSOCKET
 # ═══════════════════════════════════════════════════════════════
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket)
     try:
-        # Enviar última lectura al conectar
         db = SessionLocal()
         try:
-            ultima = db.query(Lectura).order_by(Lectura.id.desc()).first()
-            if ultima:
+            # Enviar último suero y últimos vitales al conectar
+            ultimo_suero   = db.query(Suero).order_by(Suero.id.desc()).first()
+            ultimos_vitales = db.query(Vitales).order_by(Vitales.id.desc()).first()
+
+            if ultimo_suero:
                 await websocket.send_text(json.dumps({
                     "type": "lectura",
-                    "data": ultima.to_dict()
+                    "data": ultimo_suero.to_dict(),
+                    "estado": {
+                        **ultimo_suero.to_dict(),
+                        **(ultimos_vitales.to_dict() if ultimos_vitales else {"fc": 0, "spo2": 0, "estado_vitales": "MIDIENDO"}),
+                    }
+                }, default=str))
+
+            if ultimos_vitales:
+                await websocket.send_text(json.dumps({
+                    "type": "vitales",
+                    "data": ultimos_vitales.to_dict(),
                 }, default=str))
         finally:
             db.close()
 
-        # Mantener conexión viva
         while True:
             await asyncio.sleep(30)
             await websocket.send_text(json.dumps({"type": "ping"}))
@@ -117,48 +120,82 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_manager.disconnect(websocket)
 
 # ═══════════════════════════════════════════════════════════════
-#  REST — LECTURAS
+#  REST — GENERAL
 # ═══════════════════════════════════════════════════════════════
 @app.get("/")
 def root():
     return {"status": "ok", "service": "Monitor IoT Hospitalario UNMSM"}
 
-@app.get("/lecturas")
-def get_lecturas(limit: int = 60):
-    """Últimas N lecturas para gráficas históricas."""
+# ═══════════════════════════════════════════════════════════════
+#  REST — SUERO (tabla suero)
+# ═══════════════════════════════════════════════════════════════
+@app.get("/suero")
+def get_suero(limit: int = 60):
+    """Últimas N lecturas de suero para gráfica de peso."""
     db = SessionLocal()
     try:
-        rows = (
-            db.query(Lectura)
-            .order_by(Lectura.id.desc())
-            .limit(limit)
-            .all()
-        )
+        rows = db.query(Suero).order_by(Suero.id.desc()).limit(limit).all()
         return [r.to_dict() for r in reversed(rows)]
     finally:
         db.close()
 
-@app.get("/lecturas/ultima")
-def get_ultima_lectura():
-    """Última lectura en tiempo real."""
+@app.get("/suero/ultimo")
+def get_ultimo_suero():
     db = SessionLocal()
     try:
-        row = db.query(Lectura).order_by(Lectura.id.desc()).first()
+        row = db.query(Suero).order_by(Suero.id.desc()).first()
         if not row:
-            raise HTTPException(status_code=404, detail="Sin lecturas aún")
+            raise HTTPException(status_code=404, detail="Sin lecturas de suero aún")
         return row.to_dict()
     finally:
         db.close()
 
-@app.get("/lecturas/rango")
-def get_lecturas_rango(desde: str, hasta: str):
-    """Lecturas entre dos timestamps ISO (para analytics)."""
+@app.get("/suero/rango")
+def get_suero_rango(desde: str, hasta: str):
     db = SessionLocal()
     try:
         rows = (
-            db.query(Lectura)
-            .filter(Lectura.timestamp >= desde, Lectura.timestamp <= hasta)
-            .order_by(Lectura.timestamp)
+            db.query(Suero)
+            .filter(Suero.timestamp >= desde, Suero.timestamp <= hasta)
+            .order_by(Suero.timestamp)
+            .all()
+        )
+        return [r.to_dict() for r in rows]
+    finally:
+        db.close()
+
+# ═══════════════════════════════════════════════════════════════
+#  REST — VITALES (tabla vitales)
+# ═══════════════════════════════════════════════════════════════
+@app.get("/vitales")
+def get_vitales(limit: int = 60):
+    """Últimas N lecturas de vitales promediados para gráfica FC/SpO2."""
+    db = SessionLocal()
+    try:
+        rows = db.query(Vitales).order_by(Vitales.id.desc()).limit(limit).all()
+        return [r.to_dict() for r in reversed(rows)]
+    finally:
+        db.close()
+
+@app.get("/vitales/ultimo")
+def get_ultimos_vitales():
+    db = SessionLocal()
+    try:
+        row = db.query(Vitales).order_by(Vitales.id.desc()).first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Sin lecturas de vitales aún")
+        return row.to_dict()
+    finally:
+        db.close()
+
+@app.get("/vitales/rango")
+def get_vitales_rango(desde: str, hasta: str):
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(Vitales)
+            .filter(Vitales.timestamp >= desde, Vitales.timestamp <= hasta)
+            .order_by(Vitales.timestamp)
             .all()
         )
         return [r.to_dict() for r in rows]
@@ -190,10 +227,10 @@ def limpiar_alertas():
         db.close()
 
 # ═══════════════════════════════════════════════════════════════
-#  REST — COMANDOS hacia ESP32 vía MQTT
+#  REST — COMANDOS
 # ═══════════════════════════════════════════════════════════════
 class ComandoRequest(BaseModel):
-    cmd: str   # "bomba_on" | "bomba_off" | "reset"
+    cmd: str
 
 COMANDOS_VALIDOS = {"bomba_on", "bomba_off", "reset"}
 
@@ -205,7 +242,7 @@ async def enviar_comando(body: ComandoRequest):
     return {"ok": True, "cmd": body.cmd, "timestamp": datetime.utcnow().isoformat()}
 
 # ═══════════════════════════════════════════════════════════════
-#  REST — ENVIAR CORREO A CONTACTO DEL PACIENTE
+#  REST — EMAIL
 # ═══════════════════════════════════════════════════════════════
 class EmailRequest(BaseModel):
     destinatario: str
@@ -218,25 +255,29 @@ async def enviar_email_endpoint(body: EmailRequest):
     await enviar_email_familiar(
         payload      = body.payload,
         alertas      = body.alertas,
-        destinatario = body.destinatario
+        destinatario = body.destinatario,
     )
     return {"ok": True, "destinatario": body.destinatario}
 
 # ═══════════════════════════════════════════════════════════════
-#  REST — STATS para analytics
+#  REST — STATS
 # ═══════════════════════════════════════════════════════════════
 @app.get("/stats")
 def get_stats():
     db = SessionLocal()
     try:
-        total = db.query(Lectura).count()
-        ultima = db.query(Lectura).order_by(Lectura.id.desc()).first()
+        total_suero   = db.query(Suero).count()
+        total_vitales = db.query(Vitales).count()
         alertas_activas = db.query(Alerta).filter(Alerta.activa == True).count()
+        ultimo_suero    = db.query(Suero).order_by(Suero.id.desc()).first()
+        ultimos_vitales = db.query(Vitales).order_by(Vitales.id.desc()).first()
         return {
-            "total_lecturas": total,
-            "alertas_activas": alertas_activas,
-            "ultima_lectura": ultima.to_dict() if ultima else None,
-            "clientes_ws": len(ws_manager.active),
+            "total_suero":      total_suero,
+            "total_vitales":    total_vitales,
+            "alertas_activas":  alertas_activas,
+            "ultimo_suero":     ultimo_suero.to_dict()    if ultimo_suero    else None,
+            "ultimos_vitales":  ultimos_vitales.to_dict() if ultimos_vitales else None,
+            "clientes_ws":      len(ws_manager.active),
         }
     finally:
         db.close()
