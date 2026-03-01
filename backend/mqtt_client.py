@@ -57,6 +57,7 @@ class MQTTManager:
             "estado_vitales": "MIDIENDO",
         }
         self.ultimo_origen: str = "automatico"
+        self._paciente_activo: dict | None = None
 
     # ── Guardar en tabla suero ────────────────────────────────
     def _guardar_suero(self, peso: float, bomba: bool, estado_suero: str) -> Suero:
@@ -162,6 +163,10 @@ class MQTTManager:
         finally:
             db.close()
 
+    #─ Paciente activo (para mostrar en Telegram) ─────────────────
+    def set_paciente_activo(self, paciente: dict | None):
+        self._paciente_activo = paciente
+
     # ── Publicar configuración al ESP32 ─────────────────────────
     async def publicar_config(self, peso_alerta: float, peso_critico: float):
         """Publica nuevos umbrales al ESP32 por MQTT."""
@@ -181,11 +186,10 @@ class MQTTManager:
             restante = int(INTERVALO_TELEGRAM - (ahora - self._ultimo_telegram).total_seconds())
             print(f"📱 Telegram anti-spam ({restante}s restantes)")
             return
-        mensaje, tipos = construir_mensaje(payload_completo, alertas)
+        mensaje, tipos = construir_mensaje(payload_completo, alertas, self._paciente_activo)  # ← aquí
         if mensaje:
             await enviar_alerta(mensaje, tipos)
             self._ultimo_telegram = ahora
-            print("📱 Notificación Telegram enviada")
 
     # ── Handler: lecturas → tabla suero ──────────────────────
     async def _procesar_lecturas(self, payload: dict, ws_manager):

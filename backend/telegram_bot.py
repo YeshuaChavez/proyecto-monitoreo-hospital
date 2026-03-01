@@ -12,8 +12,8 @@ import aiohttp
 
 TELEGRAM_TOKEN   = os.environ.get("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
-BACKEND_URL      = os.environ.get("VITE_API_URL", "https://proyecto-monitoreo-hospital-production.up.railway.app")
-DASHBOARD_URL    = "https://proyecto-monitoreo-hospital.vercel.app"
+BACKEND_URL  = os.environ.get("BACKEND_URL", "https://proyecto-monitoreo-posta-medica-production.up.railway.app")
+DASHBOARD_URL = "https://proyecto-monitoreo-posta-medica.vercel.app"
 TELEGRAM_URL     = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 # Solo estos tipos muestran botones de bomba
@@ -144,7 +144,7 @@ async def polling():
 
 
 # ── Construir mensaje según estado del paciente ───────────────
-def construir_mensaje(payload: dict, alertas: list) -> tuple[str | None, set]:
+def construir_mensaje(payload: dict, alertas: list, paciente: dict | None = None) -> tuple[str | None, set]:
     """
     Genera un mensaje clínico claro según el estado del paciente.
     Retorna (mensaje, tipos_presentes).
@@ -162,12 +162,19 @@ def construir_mensaje(payload: dict, alertas: list) -> tuple[str | None, set]:
     # ── Determinar severidad global ───────────────────────────
     es_critico = any(t in tipos_presentes for t in {"SUERO_CRITICO", "SPO2_BAJA"})
 
-    if es_critico:
-        encabezado = "🚨 <b>ALERTA CRÍTICA — UCI Cama 04</b>"
-    else:
-        encabezado = "⚠️ <b>ALERTA — UCI Cama 04</b>"
+    nombre_paciente = f"{paciente['nombre']} {paciente['apellido']}" if paciente else "Paciente"
+    codigo_paciente = paciente.get('codigo') or f"PCT-{paciente.get('id','?')}" if paciente else "—"
 
-    lineas = [encabezado, ""]
+    if es_critico:
+        encabezado = "🚨 <b>ALERTA CRÍTICA</b>"
+    else:
+        encabezado = "⚠️ <b>ALERTA</b>"
+
+    lineas = [
+        encabezado,
+        f"👤 <b>{nombre_paciente}</b> · <code>{codigo_paciente}</code>",
+        "",
+    ]
 
     # ── Mensaje por tipo de alerta ────────────────────────────
 

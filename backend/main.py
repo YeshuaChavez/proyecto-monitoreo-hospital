@@ -297,18 +297,25 @@ class EmailRequest(BaseModel):
 
 @app.post("/enviar-email")
 async def endpoint_email(req: EmailRequest, db: Session = Depends(get_db)):
-    paciente      = db.query(Paciente).filter(Paciente.id == req.paciente_id).first() if req.paciente_id else None
+    paciente = db.query(Paciente).filter(Paciente.id == req.paciente_id).first() if req.paciente_id else None
+    
+    # Resolver nombre del doctor manualmente
+    nombre_doctor = ""
+    if paciente and paciente.doctor_id:
+        usuario = db.query(Usuario).filter(Usuario.id == paciente.doctor_id).first()
+        nombre_doctor = usuario.nombre if usuario else ""
+
     paciente_dict = {
-        "nombre":           paciente.nombre,
-        "apellido":         paciente.apellido,
-        "codigo":           paciente.codigo,
-        "id":               paciente.id,
-        "doctor":           paciente.doctor,
-        "grupo_sanguineo":  paciente.grupo_sanguineo,
-        "fecha_ingreso":    paciente.fecha_ingreso,
-        "contacto_nombre":  paciente.contacto_nombre,
-        "contacto_telefono":paciente.contacto_telefono,
-        "contacto_relacion":paciente.contacto_relacion,
+        "nombre":            paciente.nombre,
+        "apellido":          paciente.apellido,
+        "codigo":            paciente.codigo,
+        "id":                paciente.id,
+        "doctor":            nombre_doctor,   # ← resuelto manualmente
+        "grupo_sanguineo":   paciente.grupo_sanguineo,
+        "fecha_ingreso":     paciente.fecha_ingreso,
+        "contacto_nombre":   paciente.contacto_nombre,
+        "contacto_telefono": paciente.contacto_telefono,
+        "contacto_relacion": paciente.contacto_relacion,
     } if paciente else None
 
     try:
@@ -465,7 +472,7 @@ def crear_paciente(body: PacienteRequest):
             nombre            = body.nombre,
             apellido          = body.apellido,
             codigo            = body.codigo,
-            doctor            = body.doctor,
+            doctor_id         = body.doctor_id,   # ← cambio
             grupo_sanguineo   = body.grupo_sanguineo,
             fecha_nacimiento  = body.fecha_nacimiento,
             fecha_ingreso     = body.fecha_ingreso,
@@ -479,6 +486,12 @@ def crear_paciente(body: PacienteRequest):
         db.add(p)
         db.commit()
         db.refresh(p)
+
+        # Generar código si no vino del frontend
+        if not p.codigo:
+            p.codigo = f"PCT-{datetime.now().year}-{str(p.id).zfill(4)}"
+            db.commit()
+
         return p.to_dict()
     finally:
         db.close()
@@ -493,7 +506,7 @@ def actualizar_paciente(paciente_id: int, body: PacienteRequest):
         p.nombre            = body.nombre
         p.apellido          = body.apellido
         p.codigo            = body.codigo
-        p.doctor            = body.doctor
+        p.doctor_id         = body.doctor_id    # ← cambio
         p.grupo_sanguineo   = body.grupo_sanguineo
         p.fecha_nacimiento  = body.fecha_nacimiento
         p.fecha_ingreso     = body.fecha_ingreso
@@ -540,16 +553,11 @@ class SeleccionarPacienteRequest(BaseModel):
 
 @app.post("/paciente-activo")
 async def seleccionar_paciente(body: SeleccionarPacienteRequest):
-    """
-    1. Actualiza estado global
-    2. Manda reset al ESP32
-    3. Broadcast WebSocket → frontend limpia historial
-    """
     global _paciente_activo_id
     db = SessionLocal()
     try:
         p = db.query(Paciente).filter(
-            Paciente.id    == body.paciente_id,
+            Paciente.id     == body.paciente_id,
             Paciente.activo == True,
         ).first()
         if not p:
@@ -558,6 +566,8 @@ async def seleccionar_paciente(body: SeleccionarPacienteRequest):
         _paciente_activo_id = p.id
         p.fecha_ingreso     = datetime.now().strftime("%d-%m-%Y")
         db.commit()
+
+        mqtt_manager.set_paciente_activo(p.to_dict())  # ← línea nueva
 
         await mqtt_manager.publicar_comando("reset")
         await ws_manager.broadcast({

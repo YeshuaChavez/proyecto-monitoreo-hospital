@@ -52,7 +52,7 @@ class Paciente(Base):
     created_at        = Column(DateTime, default=datetime.utcnow)
 
     # Relación con usuario (doctor/enfermero)
-    doctor = relationship("Usuario", back_populates="pacientes")
+    doctor = relationship("Usuario", back_populates="pacientes", lazy="joined")
 
     def to_dict(self):
         return {
