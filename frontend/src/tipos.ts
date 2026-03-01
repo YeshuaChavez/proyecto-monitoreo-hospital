@@ -32,14 +32,14 @@ export interface EstadoLive {
 
 // ── Alertas ───────────────────────────────────────────────────
 export interface Alerta {
-  id:          number;
-  timestamp:   string;
-  time:        string;
+  id:           number;
+  timestamp:    string;
+  time:         string;
   paciente_id?: number;
-  tipo:        string;
-  mensaje:     string;
-  valor:       number | null;
-  activa:      boolean;
+  tipo:         string;
+  mensaje:      string;
+  valor:        number | null;
+  activa:       boolean;
 }
 
 // ── Paciente de la BD ─────────────────────────────────────────
@@ -48,7 +48,8 @@ export interface PacienteDB {
   nombre:             string;
   apellido:           string;
   codigo?:            string;
-  doctor?:            string;
+  doctor?:            string;   // nombre resuelto por el backend
+  doctor_id?:         number;   // FK → usuarios (para dropdown al editar)
   grupo_sanguineo?:   string;
   fecha_nacimiento?:  string;
   fecha_ingreso?:     string;
@@ -57,24 +58,6 @@ export interface PacienteDB {
   contacto_telefono?: string;
   contacto_relacion?: string;
   activo?:            boolean;
-}
-
-// ── Paciente legacy (hardcodeado) — se puede eliminar en el futuro ──
-export interface PacienteInfo {
-  nombre:           string;
-  apellido:         string;
-  id:               string;
-  cama:             string;
-  doctor:           string;
-  grupoSanguineo:   string;
-  fechaNacimiento:  string;
-  fechaIngreso:     string;
-  direccion:        string;
-  contactoNombre:   string;
-  contactoTelefono: string;
-  contactoRelacion: string;
-  temperatura:      string;
-  presionArterial:  string;
 }
 
 // ── Usuarios Login ─────────────────────────────────────────────
