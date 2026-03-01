@@ -87,7 +87,7 @@ def _construir_html(payload: dict, alertas: list, hora: str) -> str:
   <p style="color:#6b7280;font-size:10px;font-family:monospace;letter-spacing:0.12em;margin:0 0 10px">SIGNOS VITALES</p>
   <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:22px">
     <tr>
-      <td width="25%" style="padding:4px">
+      <td width="33%" style="padding:4px">
         <div style="background:rgba(13,17,28,0.95);border:1px solid rgba(244,63,94,0.25);border-top:2px solid #f43f5e;border-radius:12px;padding:16px 10px;text-align:center">
           <div style="color:#6b7280;font-size:8px;font-family:monospace">FREC. CARDÍACA</div>
           <div style="color:{color_fc};font-size:28px;font-weight:800;font-family:monospace">{fc if fc > 0 else "--"}</div>
@@ -97,7 +97,7 @@ def _construir_html(payload: dict, alertas: list, hora: str) -> str:
                       color:{'#ef4444' if 'ALERTA' in estado_fc else '#10b981'}">{estado_fc}</div>
         </div>
       </td>
-      <td width="25%" style="padding:4px">
+      <td width="33%" style="padding:4px">
         <div style="background:rgba(13,17,28,0.95);border:1px solid rgba(0,229,255,0.25);border-top:2px solid #00e5ff;border-radius:12px;padding:16px 10px;text-align:center">
           <div style="color:#6b7280;font-size:8px;font-family:monospace">SATURACIÓN O₂</div>
           <div style="color:{color_spo2};font-size:28px;font-weight:800;font-family:monospace">{spo2 if spo2 > 0 else "--"}</div>
@@ -107,7 +107,7 @@ def _construir_html(payload: dict, alertas: list, hora: str) -> str:
                       color:{'#ef4444' if 'ALERTA' in estado_spo2 else '#10b981'}">{estado_spo2}</div>
         </div>
       </td>
-      <td width="25%" style="padding:4px">
+      <td width="33%" style="padding:4px">
         <div style="background:rgba(13,17,28,0.95);border:1px solid rgba(167,139,250,0.25);border-top:2px solid #a78bfa;border-radius:12px;padding:16px 10px;text-align:center">
           <div style="color:#6b7280;font-size:8px;font-family:monospace">FLUIDO IV</div>
           <div style="color:{color_peso};font-size:28px;font-weight:800;font-family:monospace">{peso:.0f}</div>
@@ -117,14 +117,7 @@ def _construir_html(payload: dict, alertas: list, hora: str) -> str:
                       color:{'#ef4444' if estado_peso == 'CRÍTICO' else '#f59e0b' if estado_peso == 'BAJO' else '#10b981'}">{estado_peso}</div>
         </div>
       </td>
-      <td width="25%" style="padding:4px">
-        <div style="background:rgba(13,17,28,0.95);border:1px solid {'rgba(245,158,11,0.25)' if bomba else 'rgba(16,185,129,0.2)'};
-                    border-top:2px solid {'#f59e0b' if bomba else '#10b981'};border-radius:12px;padding:16px 10px;text-align:center">
-          <div style="color:#6b7280;font-size:8px;font-family:monospace">BOMBA IV</div>
-          <div style="font-size:24px;margin:4px 0">{'⚙️' if bomba else '✅'}</div>
-          <div style="color:{'#f59e0b' if bomba else '#10b981'};font-size:14px;font-weight:800;font-family:monospace">{'ON' if bomba else 'OFF'}</div>
-        </div>
-      </td>
+
     </tr>
   </table>
 
@@ -207,7 +200,7 @@ def _generar_pdf(payload: dict, alertas: list) -> bytes | None:
         ["Frec. Cardíaca",str(fc)   if fc   > 0 else "--","bpm",    "Normal" if 60<=fc<=100 else "ALERTA"],
         ["Saturación O2", str(spo2) if spo2 > 0 else "--","%",      "Normal" if spo2>=95 else "ALERTA"],
         ["Fluido IV",     f"{peso:.1f}",                  "g",      "Normal" if peso>=150 else "CRITICO" if peso<100 else "BAJO"],
-        ["Bomba IV",      "ACTIVA" if bomba else "STANDBY","--",    "En operacion" if bomba else "En espera"],
+
     ]
     t2 = Table(datos_vitales, colWidths=[2*inch, 1.5*inch, 1*inch, 2*inch])
     t2.setStyle(TableStyle([
