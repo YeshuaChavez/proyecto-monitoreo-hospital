@@ -104,3 +104,14 @@ export async function guardarConfig(peso_alerta: number, peso_critico: number) {
   });
   return res.json();
 }
+
+// ── Login ─────────────────────────────────────────────────────
+export async function loginUsuario(usuario: string, password: string) {
+  const res = await fetch(`${API.base}/login`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ usuario, password }),
+  });
+  if (!res.ok) throw new Error("Credenciales incorrectas");
+  return res.json();
+}

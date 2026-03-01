@@ -1,14 +1,17 @@
 import { useState } from "react";
 import BarraNavegacion from "./components/BarraNavegacion";
+import Login from "./pages/Login";
 import Monitor from "./pages/Monitor";
 import Analytics from "./pages/Analytics";
 import Alertas from "./pages/Alertas";
 import Paciente from "./pages/Paciente";
 import Config from "./pages/Config";
+import { UsuarioLogin } from "./tipos";
 import { useLecturas } from "./hooks/useLecturas";
 import "./index.css";
 
 function App() {
+  const [usuarioActual, setUsuarioActual] = useState<UsuarioLogin | null>(null);
   const [tab, setTab] = useState("paciente");
   const {
     live,
@@ -18,6 +21,8 @@ function App() {
     alertas,
     setAlertas,
   } = useLecturas();
+
+  if (!usuarioActual) return <Login onLogin={setUsuarioActual} />;
 
   return (
     <div style={{

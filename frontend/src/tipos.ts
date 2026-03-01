@@ -58,5 +58,13 @@ export interface PacienteInfo {
   presionArterial:  string;
 }
 
+// ── Usuarios Login ─────────────────────────────────────────────
+export interface UsuarioLogin {
+  id:      number;
+  usuario: string;
+  nombre:  string;
+  rol:     string;
+}
+
 // ── Helpers ───────────────────────────────────────────────────
 export type EstadoVital = "ok" | "warn" | "critical";
