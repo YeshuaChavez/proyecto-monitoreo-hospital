@@ -145,18 +145,96 @@ const Analytics = ({ live, historialVitales = [], historialSuero = [] }: Props) 
     </div>
   );
 
+  const exportarCSV = (tipo: "suero" | "vitales") => {
+    if (tipo === "suero") {
+      if (!historialSuero.length) return;
+
+      const headers = ["ID", "Timestamp", "Hora", "Peso (g)", "Bomba", "Estado Suero"];
+      const filas = historialSuero.map(r => [
+        r.id,
+        r.timestamp,
+        r.time,
+        r.peso,
+        r.bomba ? "SI" : "NO",
+        r.estado_suero,
+      ]);
+
+      descargarCSV([headers, ...filas], `suero_${fecha()}.csv`);
+
+    } else {
+      if (!historialVitales.length) return;
+
+      const headers = ["ID", "Timestamp", "Hora", "FC (bpm)", "SpO2 (%)", "Estado Vitales"];
+      const filas = historialVitales.map(r => [
+        r.id,
+        r.timestamp,
+        r.time,
+        r.fc,
+        r.spo2,
+        r.estado_vitales,
+      ]);
+
+      descargarCSV([headers, ...filas], `vitales_${fecha()}.csv`);
+    }
+  };
+
+  const descargarCSV = (filas: any[][], nombre: string) => {
+    const contenido = filas
+      .map(fila => fila.map(v => `"${v ?? ""}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob(["\uFEFF" + contenido], { type: "text/csv;charset=utf-8;" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = nombre;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const fecha = () => new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
+
   // ════════════════════════════════════════════════════
   return (
     <div style={{ animation: "fadeIn 0.3s ease" }}>
-
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Analytics del Paciente</h2>
-        <p style={{ fontSize: 12, color: "#4b5563", margin: "4px 0 0", fontFamily: "'JetBrains Mono', monospace" }}>
-          {datos.length > 0
-            ? `Estadísticas de ${datos.length} promedios válidos (bloques de 10s)`
-            : "Sin promedios aún — coloca el dedo en el sensor MAX30102"}
-        </p>
+      {/* Header con botones exportar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Analytics del Paciente</h2>
+          <p style={{ fontSize: 12, color: "#4b5563", margin: "4px 0 0", fontFamily: "'JetBrains Mono', monospace" }}>
+            {datos.length > 0
+              ? `Estadísticas de ${datos.length} promedios válidos (bloques de 10s)`
+              : "Sin promedios aún — coloca el dedo en el sensor MAX30102"}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => exportarCSV("vitales")}
+            disabled={!historialVitales.length}
+            style={{
+              background: "rgba(0,229,255,0.07)",
+              border: "1px solid rgba(0,229,255,0.25)",
+              color: historialVitales.length ? "#00e5ff" : "#374151",
+              borderRadius: 8, padding: "7px 14px",
+              fontSize: 11, cursor: historialVitales.length ? "pointer" : "not-allowed",
+              fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
+            }}>
+            ⬇ CSV Vitales
+          </button>
+          <button
+            onClick={() => exportarCSV("suero")}
+            disabled={!historialSuero.length}
+            style={{
+              background: "rgba(167,139,250,0.07)",
+              border: "1px solid rgba(167,139,250,0.25)",
+              color: historialSuero.length ? "#a78bfa" : "#374151",
+              borderRadius: 8, padding: "7px 14px",
+              fontSize: 11, cursor: historialSuero.length ? "pointer" : "not-allowed",
+              fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
+            }}>
+            ⬇ CSV Suero
+          </button>
+        </div>
       </div>
 
       {/* ── SECCIÓN 1: Estadísticas vitales ── */}

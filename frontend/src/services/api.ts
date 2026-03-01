@@ -89,3 +89,18 @@ export async function getStats() {
   if (!res.ok) return null;
   return res.json();
 }
+
+export async function getConfig() {
+  const res = await fetch(`${API.base}/config`);
+  return res.json();
+}
+
+// ── Configuración de umbrales ───────────────────────────────────────────────
+export async function guardarConfig(peso_alerta: number, peso_critico: number) {
+  const res = await fetch(`${API.base}/config`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ peso_alerta, peso_critico }),
+  });
+  return res.json();
+}

@@ -4,6 +4,7 @@ import Monitor from "./pages/Monitor";
 import Analytics from "./pages/Analytics";
 import Alertas from "./pages/Alertas";
 import Paciente from "./pages/Paciente";
+import Config from "./pages/Config";
 import { useLecturas } from "./hooks/useLecturas";
 import "./index.css";
 
@@ -35,9 +36,10 @@ function App() {
 
       <main style={{ position: "relative", zIndex: 1, padding: "28px 32px", maxWidth: 1400, margin: "0 auto" }}>
         {tab === "overview"   && <Monitor   live={live} historialSuero={historialSuero} historialVitales={historialVitales} />}
-        {tab === "analytics"  && <Analytics live={live} historialVitales={historialVitales} />}
-        {tab === "paciente"   && <Paciente  live={live} />}
+        {tab === "analytics"  && <Analytics live={live} historialVitales={historialVitales} historialSuero={historialSuero} />}
+        {tab === "paciente"   && <Paciente  live={live} alertas={alertas} />}
         {tab === "alertas"    && <Alertas   alertas={alertas} limpiarAlertas={() => setAlertas([])} />}
+        {tab === "config"     && <Config />}  {/* ← nuevo */}
       </main>
 
       <footer style={{
