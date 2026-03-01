@@ -1,6 +1,21 @@
 import { useState, useEffect } from "react";
 import { getConfig, guardarConfig, loginUsuario } from "../services/api";
 import { UsuarioLogin } from "../tipos";
+import {
+  Settings,
+  AlertTriangle,
+  AlertOctagon,
+  Save,
+  Lock,
+  Eye,
+  EyeOff,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  Check,
+  X,
+  Info,
+} from "lucide-react";
 
 interface Props {
   usuarioActual: UsuarioLogin;
@@ -29,7 +44,6 @@ const Config = ({ usuarioActual }: Props) => {
     });
   }, []);
 
-  // Abre el modal antes de guardar
   const handleClickGuardar = () => {
     if (pesoCritico >= pesoAlerta) {
       setResultado("❌ El umbral crítico debe ser menor que el de alerta");
@@ -41,7 +55,6 @@ const Config = ({ usuarioActual }: Props) => {
     setModalAbierto(true);
   };
 
-  // Confirma con contraseña y guarda
   const handleConfirmar = async () => {
     if (!passConfirm) {
       setErrorConfirm("Ingresa tu contraseña");
@@ -50,9 +63,7 @@ const Config = ({ usuarioActual }: Props) => {
     setVerificando(true);
     setErrorConfirm("");
     try {
-      // Verifica contraseña contra la BD
       await loginUsuario(usuarioActual.usuario, passConfirm);
-      // Si no lanzó error, contraseña correcta → guardar
       setModalAbierto(false);
       setGuardando(true);
       setResultado(null);
@@ -88,7 +99,10 @@ const Config = ({ usuarioActual }: Props) => {
 
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>⚙️ Configuración</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+          <Settings size={20} color="#00e5ff" />
+          Configuración
+        </h2>
         <p style={{ fontSize: 12, color: "#4b5563", margin: "4px 0 0", fontFamily: "'JetBrains Mono', monospace" }}>
           Los cambios se aplican en tiempo real al ESP32 vía MQTT
         </p>
@@ -111,8 +125,9 @@ const Config = ({ usuarioActual }: Props) => {
         {/* Umbral alerta */}
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#f59e0b" }}>
-              ⚠️ Umbral de Alerta
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#f59e0b", display: "flex", alignItems: "center", gap: 6 }}>
+              <AlertTriangle size={14} color="#f59e0b" />
+              Umbral de Alerta
             </label>
             <span style={{ fontSize: 11, color: "#6b7280", fontFamily: "'JetBrains Mono', monospace" }}>
               LED rojo + buzzer 3 pitidos
@@ -145,8 +160,9 @@ const Config = ({ usuarioActual }: Props) => {
         {/* Umbral crítico */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#ef4444" }}>
-              🚨 Umbral Crítico
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#ef4444", display: "flex", alignItems: "center", gap: 6 }}>
+              <AlertOctagon size={14} color="#ef4444" />
+              Umbral Crítico
             </label>
             <span style={{ fontSize: 11, color: "#6b7280", fontFamily: "'JetBrains Mono', monospace" }}>
               Activa bomba + buzzer 5 pitidos
@@ -221,8 +237,13 @@ const Config = ({ usuarioActual }: Props) => {
             fontSize: 12, fontWeight: 600,
             color: resultado.startsWith("✅") ? "#10b981" : "#ef4444",
             fontFamily: "'JetBrains Mono', monospace",
+            display: "flex", alignItems: "center", gap: 8,
           }}>
-            {resultado}
+            {resultado.startsWith("✅")
+              ? <CheckCircle size={14} color="#10b981" />
+              : <XCircle size={14} color="#ef4444" />
+            }
+            {resultado.replace(/^[✅❌]\s?/, "")}
           </div>
         )}
 
@@ -240,8 +261,12 @@ const Config = ({ usuarioActual }: Props) => {
             cursor: guardando ? "not-allowed" : "pointer",
             fontFamily: "'JetBrains Mono', monospace",
             letterSpacing: "0.06em",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
           }}>
-          {guardando ? "Enviando al ESP32..." : "💾 GUARDAR"}
+          {guardando
+            ? <><Loader2 size={14} style={{ animation: "spin 0.7s linear infinite" }} /> Enviando al ESP32...</>
+            : <><Save size={14} /> GUARDAR</>
+          }
         </button>
       </div>
 
@@ -276,11 +301,7 @@ const Config = ({ usuarioActual }: Props) => {
                 border: "1px solid rgba(245,158,11,0.2)",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="11" width="18" height="11" rx="2" stroke="#f59e0b" strokeWidth="1.8"/>
-                  <path d="M7 11V7a5 5 0 0110 0v4" stroke="#f59e0b" strokeWidth="1.8" strokeLinecap="round"/>
-                  <circle cx="12" cy="16" r="1.5" fill="#f59e0b"/>
-                </svg>
+                <Lock size={24} color="#f59e0b" />
               </div>
               <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 6px", color: "#f1f5f9" }}>
                 Confirmar cambios
@@ -299,11 +320,15 @@ const Config = ({ usuarioActual }: Props) => {
             }}>
               <div style={{ color: "#6b7280", marginBottom: 6 }}>CAMBIOS A APLICAR</div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ color: "#f59e0b" }}>⚠️ Umbral alerta</span>
+                <span style={{ color: "#f59e0b", display: "flex", alignItems: "center", gap: 5 }}>
+                  <AlertTriangle size={11} color="#f59e0b" /> Umbral alerta
+                </span>
                 <span style={{ color: "#e2e8f0", fontWeight: 700 }}>{pesoAlerta} g</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#ef4444" }}>🚨 Umbral crítico</span>
+                <span style={{ color: "#ef4444", display: "flex", alignItems: "center", gap: 5 }}>
+                  <AlertOctagon size={11} color="#ef4444" /> Umbral crítico
+                </span>
                 <span style={{ color: "#e2e8f0", fontWeight: 700 }}>{pesoCritico} g</span>
               </div>
             </div>
@@ -332,11 +357,9 @@ const Config = ({ usuarioActual }: Props) => {
                   position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)",
                   color: focusPass ? "#f59e0b" : "#374151",
                   transition: "color 0.2s", pointerEvents: "none",
+                  display: "flex", alignItems: "center",
                 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/>
-                    <path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
+                  <Lock size={14} color={focusPass ? "#f59e0b" : "#374151"} />
                 </div>
                 <input
                   type={mostrarPass ? "text" : "password"}
@@ -366,19 +389,13 @@ const Config = ({ usuarioActual }: Props) => {
                     background: "none", border: "none",
                     color: mostrarPass ? "#f59e0b" : "#4b5563",
                     cursor: "pointer", padding: 4, transition: "color 0.2s",
+                    display: "flex", alignItems: "center",
                   }}
                 >
-                  {mostrarPass ? (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22"
-                        stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                  ) : (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2"/>
-                      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-                    </svg>
-                  )}
+                  {mostrarPass
+                    ? <EyeOff size={15} color={mostrarPass ? "#f59e0b" : "#4b5563"} />
+                    : <Eye size={15} color={mostrarPass ? "#f59e0b" : "#4b5563"} />
+                  }
                 </button>
               </div>
 
@@ -389,10 +406,7 @@ const Config = ({ usuarioActual }: Props) => {
                   fontFamily: "'JetBrains Mono', monospace",
                   display: "flex", alignItems: "center", gap: 6,
                 }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                    <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
+                  <Info size={11} color="#ef4444" />
                   {errorConfirm}
                 </div>
               )}
@@ -417,16 +431,15 @@ const Config = ({ usuarioActual }: Props) => {
                 }}>
                 {verificando ? (
                   <>
-                    <div style={{
-                      width: 12, height: 12,
-                      border: "2px solid rgba(245,158,11,0.3)",
-                      borderTopColor: "#f59e0b",
-                      borderRadius: "50%",
-                      animation: "spin 0.7s linear infinite",
-                    }}/>
+                    <Loader2 size={12} style={{ animation: "spin 0.7s linear infinite" }} />
                     VERIFICANDO...
                   </>
-                ) : "✓ CONFIRMAR"}
+                ) : (
+                  <>
+                    <Check size={12} />
+                    CONFIRMAR
+                  </>
+                )}
               </button>
 
               <button
@@ -441,7 +454,9 @@ const Config = ({ usuarioActual }: Props) => {
                   fontSize: 12, cursor: verificando ? "not-allowed" : "pointer",
                   fontFamily: "'JetBrains Mono', monospace",
                   transition: "all 0.2s",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                 }}>
+                <X size={12} />
                 Cancelar
               </button>
             </div>
@@ -449,7 +464,6 @@ const Config = ({ usuarioActual }: Props) => {
         </div>
       )}
 
-      {/* Spinner keyframe */}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );

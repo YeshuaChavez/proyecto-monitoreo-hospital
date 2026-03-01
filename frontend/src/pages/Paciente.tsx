@@ -1,4 +1,10 @@
 import { useState } from "react";
+import {
+  User, Users, Pencil, Save, X, Play, Square,
+  Droplets, Mail, Heart, Activity, AlertTriangle,
+  ChevronRight, Stethoscope, ClipboardList, Phone,
+  MapPin, Calendar, Syringe, Wifi, Send,
+} from "lucide-react";
 import InsigniaAlerta from "../components/InsigniaAlerta";
 import BarraFluido from "../components/BarraFluido";
 import EscenaPaciente from "../components/EscenaPaciente";
@@ -7,7 +13,7 @@ import { enviarComando, enviarEmail } from "../services/api";
 
 interface Props {
   live:    EstadoLive;
-  alertas?: Alerta[];   // ✅ recibe alertas reales para el reporte
+  alertas?: Alerta[];
 }
 
 const datosIniciales: PacienteInfo = {
@@ -19,9 +25,12 @@ const datosIniciales: PacienteInfo = {
   contactoRelacion: "Esposa", temperatura: "36.8", presionArterial: "120/80",
 };
 
-const Campo = ({ label, valor }: { label: string; valor: string }) => (
+const Campo = ({ label, valor, icon }: { label: string; valor: string; icon?: React.ReactNode }) => (
   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-    <span style={{ fontSize: 11, color: "#6b7280", fontFamily: "'JetBrains Mono', monospace" }}>{label}</span>
+    <span style={{ fontSize: 11, color: "#6b7280", fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 6 }}>
+      {icon && <span style={{ opacity: 0.6 }}>{icon}</span>}
+      {label}
+    </span>
     <span style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0" }}>{valor}</span>
   </div>
 );
@@ -51,7 +60,6 @@ const Paciente = ({ live, alertas = [] }: Props) => {
   const guardar  = () => { setPaciente(temp); setEditando(false); };
   const cancelar = () => { setTemp(paciente); setEditando(false); };
 
-  // Umbrales alineados con ESP32 y Monitor
   const fluidoStatus = live.peso <= 100 ? "critical" : live.peso <= 150 ? "warn" : "ok";
   const bombaOn      = live.bomba;
   const estadoBomba  = bombaOn ? "AUTO — Bomba activa por ESP32" : "STANDBY — Bomba en espera";
@@ -73,7 +81,6 @@ const Paciente = ({ live, alertas = [] }: Props) => {
     setEnviandoEmail(true);
     setEmailOk(null);
     try {
-      // ✅ CORREGIDO: pasa las alertas reales, no []
       await enviarEmail(emailDest, live, alertas);
       setEmailOk("✅ Correo enviado correctamente");
       setTimeout(() => { setModalEmail(false); setEmailOk(null); setEmailDest(""); }, 2000);
@@ -90,9 +97,8 @@ const Paciente = ({ live, alertas = [] }: Props) => {
     fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none",
   };
 
-  // Conteo alertas para preview del email
-  const alertasCriticas  = alertas.filter(a => ["SUERO_CRITICO","FC_ALTA","FC_BAJA","SPO2_BAJA"].includes(a.tipo)).length;
-  const alertasTotal     = alertas.length;
+  const alertasCriticas = alertas.filter(a => ["SUERO_CRITICO","FC_ALTA","FC_BAJA","SPO2_BAJA"].includes(a.tipo)).length;
+  const alertasTotal    = alertas.length;
 
   return (
     <div style={{ animation: "fadeIn 0.3s ease" }}>
@@ -108,11 +114,17 @@ const Paciente = ({ live, alertas = [] }: Props) => {
         <div style={{ display: "flex", gap: 8 }}>
           {editando ? (
             <>
-              <button onClick={guardar}  style={{ background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.4)",  color: "#10b981", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Guardar</button>
-              <button onClick={cancelar} style={{ background: "rgba(107,114,128,0.1)", border: "1px solid rgba(107,114,128,0.3)", color: "#6b7280", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer" }}>Cancelar</button>
+              <button onClick={guardar} style={{ background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.4)", color: "#10b981", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                <Save size={13}/> Guardar
+              </button>
+              <button onClick={cancelar} style={{ background: "rgba(107,114,128,0.1)", border: "1px solid rgba(107,114,128,0.3)", color: "#6b7280", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                <X size={13}/> Cancelar
+              </button>
             </>
           ) : (
-            <button onClick={() => setEditando(true)} style={{ background: "rgba(0,229,255,0.07)", border: "1px solid rgba(0,229,255,0.25)", color: "#00e5ff", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>✏️ Editar datos</button>
+            <button onClick={() => setEditando(true)} style={{ background: "rgba(0,229,255,0.07)", border: "1px solid rgba(0,229,255,0.25)", color: "#00e5ff", borderRadius: 8, padding: "7px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+              <Pencil size={13}/> Editar datos
+            </button>
           )}
         </div>
       </div>
@@ -125,7 +137,8 @@ const Paciente = ({ live, alertas = [] }: Props) => {
           borderRadius: 16, overflow: "hidden", position: "sticky", top: 72,
         }}>
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg,transparent,#00cfff,transparent)", zIndex: 1 }}/>
-          <div style={{ position: "absolute", top: 11, left: 14, zIndex: 2, fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "rgba(0,200,255,0.38)", letterSpacing: "0.18em" }}>
+          <div style={{ position: "absolute", top: 11, left: 14, zIndex: 2, fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "rgba(0,200,255,0.38)", letterSpacing: "0.18em", display: "flex", alignItems: "center", gap: 6 }}>
+            <Wifi size={8} color="rgba(0,200,255,0.38)"/>
             VISUALIZACIÓN EN TIEMPO REAL · ESP32
           </div>
           <EscenaPaciente lectura={live} />
@@ -138,7 +151,9 @@ const Paciente = ({ live, alertas = [] }: Props) => {
           <div style={{ background: "rgba(13,17,28,0.88)", border: "1px solid rgba(0,229,255,0.13)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
             <TopBar color="#00e5ff"/>
             <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 13 }}>
-              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "linear-gradient(135deg,#1e2436,#2d3748)", border: "2px solid rgba(0,229,255,0.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, flexShrink: 0 }}>👤</div>
+              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "linear-gradient(135deg,#1e2436,#2d3748)", border: "2px solid rgba(0,229,255,0.35)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <User size={18} color="#00e5ff"/>
+              </div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#f1f5f9", lineHeight: 1.3 }}>{paciente.nombre} {paciente.apellido}</div>
                 <InsigniaAlerta label={`Consultorio ${paciente.cama}`} type="ok"/>
@@ -156,12 +171,12 @@ const Paciente = ({ live, alertas = [] }: Props) => {
               </div>
             ) : (
               <>
-                <Campo label="ID Paciente"     valor={paciente.id}/>
-                <Campo label="Doctor asignado" valor={paciente.doctor}/>
-                <Campo label="Grupo sanguíneo" valor={paciente.grupoSanguineo}/>
-                <Campo label="Fecha nac."      valor={paciente.fechaNacimiento}/>
-                <Campo label="Fecha ingreso"   valor={paciente.fechaIngreso}/>
-                <Campo label="Dirección"       valor={paciente.direccion}/>
+                <Campo label="ID Paciente"     valor={paciente.id}           icon={<ClipboardList size={11}/>}/>
+                <Campo label="Doctor asignado" valor={paciente.doctor}        icon={<Stethoscope size={11}/>}/>
+                <Campo label="Grupo sanguíneo" valor={paciente.grupoSanguineo} icon={<Droplets size={11}/>}/>
+                <Campo label="Fecha nac."      valor={paciente.fechaNacimiento} icon={<Calendar size={11}/>}/>
+                <Campo label="Fecha ingreso"   valor={paciente.fechaIngreso}   icon={<Calendar size={11}/>}/>
+                <Campo label="Dirección"       valor={paciente.direccion}       icon={<MapPin size={11}/>}/>
               </>
             )}
           </div>
@@ -171,7 +186,9 @@ const Paciente = ({ live, alertas = [] }: Props) => {
             <TopBar color="#a78bfa"/>
             <SeccionLabel color="#a78bfa">CONTACTO FAMILIAR</SeccionLabel>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 11 }}>
-              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.28)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>👥</div>
+              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.28)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Users size={15} color="#a78bfa"/>
+              </div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700 }}>{paciente.contactoNombre}</div>
                 <div style={{ fontSize: 10, color: "#6b7280" }}>{paciente.contactoRelacion}</div>
@@ -188,8 +205,8 @@ const Paciente = ({ live, alertas = [] }: Props) => {
               </div>
             ) : (
               <>
-                <Campo label="Teléfono" valor={paciente.contactoTelefono}/>
-                <Campo label="Relación" valor={paciente.contactoRelacion}/>
+                <Campo label="Teléfono" valor={paciente.contactoTelefono} icon={<Phone size={11}/>}/>
+                <Campo label="Relación" valor={paciente.contactoRelacion}  icon={<ChevronRight size={11}/>}/>
                 <div style={{ marginTop: 14 }}>
                   <button
                     onClick={() => setModalEmail(true)}
@@ -202,8 +219,9 @@ const Paciente = ({ live, alertas = [] }: Props) => {
                       cursor: "pointer", fontWeight: 700,
                       fontFamily: "'JetBrains Mono', monospace",
                       letterSpacing: "0.06em",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                     }}>
-                    📧 ENVIAR REPORTE
+                    <Mail size={14}/> ENVIAR REPORTE
                   </button>
                 </div>
               </>
@@ -217,7 +235,9 @@ const Paciente = ({ live, alertas = [] }: Props) => {
 
             <div style={{ marginBottom: 13 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
-                <span style={{ fontSize: 11, color: "#9ca3af" }}>Nivel actual</span>
+                <span style={{ fontSize: 11, color: "#9ca3af", display: "flex", alignItems: "center", gap: 6 }}>
+                  <Droplets size={13} color="#9ca3af"/> Nivel actual
+                </span>
                 <InsigniaAlerta label={fluidoStatus === "ok" ? "Normal" : fluidoStatus === "warn" ? "Bajo" : "Crítico"} type={fluidoStatus}/>
               </div>
               <BarraFluido peso={live.peso}/>
@@ -227,8 +247,12 @@ const Paciente = ({ live, alertas = [] }: Props) => {
                 <span style={{ fontSize: 9, color: "#374151", fontFamily: "'JetBrains Mono', monospace" }}>500g</span>
               </div>
               <div style={{ marginTop: 7, fontSize: 10, color: "#4b5563", display: "flex", gap: 12 }}>
-                <span><span style={{ color: "#f59e0b" }}>▸</span> Advertencia: 150g</span>
-                <span><span style={{ color: "#ef4444" }}>▸</span> Bomba ON / Crítico: 100g</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <AlertTriangle size={10} color="#f59e0b"/> Advertencia: 150g
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <Activity size={10} color="#ef4444"/> Bomba ON / Crítico: 100g
+                </span>
               </div>
             </div>
 
@@ -244,8 +268,9 @@ const Paciente = ({ live, alertas = [] }: Props) => {
                   color: bombaOn ? "#4b5563" : "#f59e0b",
                   borderRadius: 8, padding: "9px 4px", fontSize: 11,
                   cursor: (enviando || bombaOn) ? "not-allowed" : "pointer", fontWeight: 700,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                 }}>
-                {enviando ? "..." : "▶ INICIAR"}
+                <Play size={12}/> {enviando ? "..." : "INICIAR"}
               </button>
               <button
                 onClick={() => handleComando("bomba_off")}
@@ -257,14 +282,15 @@ const Paciente = ({ live, alertas = [] }: Props) => {
                   color: !bombaOn ? "#4b5563" : "#ef4444",
                   borderRadius: 8, padding: "9px 4px",
                   fontSize: 11, cursor: (enviando || !bombaOn) ? "not-allowed" : "pointer", fontWeight: 700,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                 }}>
-                {enviando ? "..." : "■ DETENER"}
+                <Square size={12}/> {enviando ? "..." : "DETENER"}
               </button>
             </div>
 
             {error && (
-              <div style={{ marginTop: 8, fontSize: 10, color: "#ef4444", fontFamily: "'JetBrains Mono', monospace" }}>
-                ⚠ {error}
+              <div style={{ marginTop: 8, fontSize: 10, color: "#ef4444", fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 6 }}>
+                <AlertTriangle size={11}/> {error}
               </div>
             )}
 
@@ -275,8 +301,9 @@ const Paciente = ({ live, alertas = [] }: Props) => {
               borderRadius: 7, fontSize: 10,
               color: bombaOn ? "#f59e0b" : "#10b981",
               fontFamily: "'JetBrains Mono', monospace",
+              display: "flex", alignItems: "center", gap: 6,
             }}>
-              {estadoBomba}
+              <Syringe size={11}/> {estadoBomba}
             </div>
           </div>
         </div>
@@ -300,8 +327,8 @@ const Paciente = ({ live, alertas = [] }: Props) => {
               background: "linear-gradient(90deg,transparent,#10b981,transparent)",
               borderRadius: "16px 16px 0 0",
             }}/>
-            <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 6px", color: "#f1f5f9" }}>
-              📧 Enviar reporte por correo
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 6px", color: "#f1f5f9", display: "flex", alignItems: "center", gap: 8 }}>
+              <Mail size={16} color="#10b981"/> Enviar reporte por correo
             </h3>
             <p style={{ fontSize: 11, color: "#4b5563", margin: "0 0 20px", fontFamily: "'JetBrains Mono', monospace" }}>
               Se enviará el reporte del paciente con PDF adjunto
@@ -327,7 +354,7 @@ const Paciente = ({ live, alertas = [] }: Props) => {
               />
             </div>
 
-            {/* ✅ Preview del contenido del reporte */}
+            {/* Preview reporte */}
             <div style={{
               background: "rgba(0,229,255,0.04)",
               border: "1px solid rgba(0,229,255,0.1)",
@@ -336,17 +363,28 @@ const Paciente = ({ live, alertas = [] }: Props) => {
               fontFamily: "'JetBrains Mono', monospace",
             }}>
               <div style={{ color: "#9ca3af", marginBottom: 8, fontSize: 10, letterSpacing: "0.1em" }}>CONTENIDO DEL REPORTE</div>
-              <div style={{ marginBottom: 4 }}>
-                👤 <span style={{ color: "#e2e8f0" }}>{paciente.nombre} {paciente.apellido}</span>
-                <span style={{ color: "#374151" }}> · {paciente.id}</span>
+              <div style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                <User size={11} color="#6b7280"/>
+                <span style={{ color: "#e2e8f0" }}>{paciente.nombre} {paciente.apellido}</span>
+                <span style={{ color: "#374151" }}>· {paciente.id}</span>
               </div>
-              <div style={{ marginBottom: 4 }}>
-                ❤️ FC: <span style={{ color: "#f43f5e" }}>{live.fc > 0 ? live.fc + " bpm" : "--"}</span>
-                {"  "}🫁 SpO2: <span style={{ color: "#00e5ff" }}>{live.spo2 > 0 ? live.spo2 + "%" : "--"}</span>
-                {"  "}💧 IV: <span style={{ color: "#a78bfa" }}>{live.peso.toFixed(1)}g</span>
+              <div style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <Heart size={11} color="#f43f5e"/>
+                  <span style={{ color: "#f43f5e" }}>{live.fc > 0 ? live.fc + " bpm" : "--"}</span>
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <Activity size={11} color="#00e5ff"/>
+                  <span style={{ color: "#00e5ff" }}>{live.spo2 > 0 ? live.spo2 + "%" : "--"}</span>
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <Droplets size={11} color="#a78bfa"/>
+                  <span style={{ color: "#a78bfa" }}>{live.peso.toFixed(1)}g</span>
+                </span>
               </div>
-              <div>
-                📋 Alertas: <span style={{ color: alertasCriticas > 0 ? "#ef4444" : "#10b981" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <AlertTriangle size={11} color={alertasCriticas > 0 ? "#ef4444" : "#10b981"}/>
+                Alertas: <span style={{ color: alertasCriticas > 0 ? "#ef4444" : "#10b981" }}>
                   {alertasTotal > 0 ? `${alertasTotal} total (${alertasCriticas} críticas)` : "Sin alertas"}
                 </span>
               </div>
@@ -374,8 +412,9 @@ const Paciente = ({ live, alertas = [] }: Props) => {
                   borderRadius: 8, padding: "10px 0",
                   fontSize: 13, fontWeight: 700,
                   cursor: (!emailDest || enviandoEmail) ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 }}>
-                {enviandoEmail ? "Enviando..." : "📧 Enviar"}
+                <Send size={13}/> {enviandoEmail ? "Enviando..." : "Enviar"}
               </button>
               <button
                 onClick={() => { setModalEmail(false); setEmailDest(""); setEmailOk(null); }}
@@ -385,8 +424,9 @@ const Paciente = ({ live, alertas = [] }: Props) => {
                   color: "#6b7280", borderRadius: 8,
                   padding: "10px 0", fontSize: 13,
                   cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 }}>
-                Cancelar
+                <X size={13}/> Cancelar
               </button>
             </div>
           </div>

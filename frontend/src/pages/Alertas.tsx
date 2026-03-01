@@ -1,4 +1,8 @@
 import { useState, useRef, useEffect } from "react";
+import {
+  AlertTriangle, AlertOctagon, Syringe,
+  Heart, Wind, CheckCircle, Trash2, Bell,
+} from "lucide-react";
 import InsigniaAlerta from "../components/InsigniaAlerta";
 import { Alerta } from "../tipos";
 
@@ -14,18 +18,22 @@ function severidad(tipo: string): "critical" | "warn" {
     ? "critical" : "warn";
 }
 
-function emoji(tipo: string): string {
-  const map: Record<string, string> = {
-    SUERO_CRITICO: "🚨", SUERO_BAJO: "⚠️", BOMBA_ON: "💉",
-    FC_ALTA: "❤️", FC_BAJA: "❤️", SPO2_BAJA: "🫁",
-  };
-  return map[tipo] ?? "⚠️";
+function IconoAlerta({ tipo, size = 18 }: { tipo: string; size?: number }) {
+  const props = { size, strokeWidth: 2 };
+  switch (tipo) {
+    case "SUERO_CRITICO": return <AlertOctagon  {...props} color="#ef4444" />;
+    case "SUERO_BAJO":    return <AlertTriangle {...props} color="#f59e0b" />;
+    case "BOMBA_ON":      return <Syringe       {...props} color="#a78bfa" />;
+    case "FC_ALTA":       return <Heart         {...props} color="#ef4444" />;
+    case "FC_BAJA":       return <Heart         {...props} color="#f59e0b" />;
+    case "SPO2_BAJA":     return <Wind          {...props} color="#ef4444" />;
+    default:              return <AlertTriangle {...props} color="#f59e0b" />;
+  }
 }
 
 function esTipoVital(tipo: string) { return ["FC_ALTA","FC_BAJA","SPO2_BAJA"].includes(tipo); }
 function esTipoSuero(tipo: string) { return ["SUERO_CRITICO","SUERO_BAJO","BOMBA_ON"].includes(tipo); }
 
-// Agrupa alertas CONSECUTIVAS del mismo tipo → badge ×N
 function agrupar(alertas: Alerta[]) {
   const grupos: { alerta: Alerta; count: number; key: string }[] = [];
   for (const a of alertas) {
@@ -44,7 +52,6 @@ const Alertas = ({ alertas, limpiarAlertas }: Props) => {
   const [nuevas, setNuevas] = useState<Set<number>>(new Set());
   const prevLengthRef       = useRef(alertas.length);
 
-  // ✅ CORREGIDO: las nuevas alertas están al FINAL del array
   useEffect(() => {
     if (alertas.length > prevLengthRef.current) {
       const diff = alertas.length - prevLengthRef.current;
@@ -57,7 +64,7 @@ const Alertas = ({ alertas, limpiarAlertas }: Props) => {
     prevLengthRef.current = alertas.length;
   }, [alertas]);
 
-  const criticos    = alertas.filter(a => severidad(a.tipo) === "critical").length;
+  const criticos     = alertas.filter(a => severidad(a.tipo) === "critical").length;
   const advertencias = alertas.filter(a => severidad(a.tipo) === "warn").length;
 
   const filtradas = alertas.filter(a => {
@@ -105,7 +112,9 @@ const Alertas = ({ alertas, limpiarAlertas }: Props) => {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
         <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Registro de Alertas</h2>
+          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 10 }}>
+            <Bell size={20} color="#e2e8f0" /> Registro de Alertas
+          </h2>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
             {criticos > 0 && (
               <span style={{
@@ -113,8 +122,9 @@ const Alertas = ({ alertas, limpiarAlertas }: Props) => {
                 color: "#ef4444", background: "rgba(239,68,68,0.1)",
                 border: "1px solid rgba(239,68,68,0.25)",
                 borderRadius: 6, padding: "2px 8px",
+                display: "flex", alignItems: "center", gap: 5,
               }}>
-                🚨 {criticos} crítico{criticos !== 1 ? "s" : ""}
+                <AlertOctagon size={11}/> {criticos} crítico{criticos !== 1 ? "s" : ""}
               </span>
             )}
             {advertencias > 0 && (
@@ -123,8 +133,9 @@ const Alertas = ({ alertas, limpiarAlertas }: Props) => {
                 color: "#f59e0b", background: "rgba(245,158,11,0.1)",
                 border: "1px solid rgba(245,158,11,0.25)",
                 borderRadius: 6, padding: "2px 8px",
+                display: "flex", alignItems: "center", gap: 5,
               }}>
-                ⚠️ {advertencias} advertencia{advertencias !== 1 ? "s" : ""}
+                <AlertTriangle size={11}/> {advertencias} advertencia{advertencias !== 1 ? "s" : ""}
               </span>
             )}
             {alertas.length === 0 && (
@@ -139,15 +150,16 @@ const Alertas = ({ alertas, limpiarAlertas }: Props) => {
           background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
           color: "#ef4444", borderRadius: 8, padding: "8px 16px",
           fontSize: 12, cursor: "pointer", fontWeight: 600,
+          display: "flex", alignItems: "center", gap: 6,
         }}>
-          Limpiar
+          <Trash2 size={13}/> Limpiar
         </button>
       </div>
 
       {/* Filtros */}
       {alertas.length > 0 && (
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          {btnFiltro("todas",   "Todas",   alertas.length,                                             "#e2e8f0")}
+          {btnFiltro("todas",   "Todas",   alertas.length,                                  "#e2e8f0")}
           {btnFiltro("vitales", "Vitales", alertas.filter(a => esTipoVital(a.tipo)).length, "#f43f5e")}
           {btnFiltro("suero",   "Suero",   alertas.filter(a => esTipoSuero(a.tipo)).length, "#a78bfa")}
         </div>
@@ -160,7 +172,9 @@ const Alertas = ({ alertas, limpiarAlertas }: Props) => {
           background: "rgba(13,17,28,0.8)", border: "1px solid rgba(255,255,255,0.06)",
           borderRadius: 16,
         }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+            <CheckCircle size={48} color="#10b981" strokeWidth={1.5} />
+          </div>
           <div style={{ fontSize: 16, fontWeight: 700, color: "#10b981" }}>
             {filtro === "todas" ? "Sin alertas activas" : `Sin alertas de ${filtro}`}
           </div>
@@ -191,7 +205,7 @@ const Alertas = ({ alertas, limpiarAlertas }: Props) => {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ fontSize: 18 }}>{emoji(alerta.tipo)}</span>
+                  <IconoAlerta tipo={alerta.tipo} size={20} />
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: sev === "critical" ? "#ef4444" : "#f59e0b" }}>

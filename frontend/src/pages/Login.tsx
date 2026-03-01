@@ -243,14 +243,14 @@ export default function Login({ onLogin }: { onLogin: (user: UsuarioLogin) => vo
             </svg>
           </div>
           <span style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>
-            Sistema de Monitoreo — Posta Médica
+            Sistema de Monitoreo - Posta Médica
           </span>
         </div>
         <div style={{
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: 10, color: "#374151",
         }}>
-          UNMSM · FISI · IoT 2026
+          Panel de Control
         </div>
       </div>
 
