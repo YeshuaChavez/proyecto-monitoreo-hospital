@@ -29,7 +29,7 @@ Base = declarative_base()
 
 
 def init_db():
-    from models import Suero, Vitales, Alerta
-    Base.metadata.drop_all(bind=engine)   # ← solo esta vez
+    """Crea las tablas si no existen."""
+    from models import Suero, Vitales, Alerta  # tablas separadas
     Base.metadata.create_all(bind=engine)
     print("✅ Base de datos inicializada")
