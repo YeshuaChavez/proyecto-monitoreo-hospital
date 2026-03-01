@@ -211,20 +211,20 @@ const EscenaPaciente = ({ lectura }: Props) => {
         </path>
 
         {/* Tag SpO2 flotante */}
-        <rect x="314" y="270" width="56" height="26" rx="5" fill="rgba(255,20,50,0.15)" stroke="rgba(255,60,90,0.45)" strokeWidth={1}/>
-        <text x="342" y="280" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="6.5" fill="rgba(255,100,120,0.8)" letterSpacing="1">SpO₂</text>
-        <text x="342" y="292" textAnchor="middle" fontFamily="Orbitron" fontWeight="700" fontSize="10" fill="rgba(255,80,100,0.98)">{spo2}%</text>
-        <line x1="342" y1="296" x2="342" y2="300" stroke="rgba(255,60,90,0.4)" strokeWidth={1} strokeDasharray="2,2"/>
+        <rect x="424" y="372" width="56" height="26" rx="5" fill="rgba(255,20,50,0.15)" stroke="rgba(255,60,90,0.45)" strokeWidth={1}/>
+        <text x="453" y="382" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="6.5" fill="rgba(255,100,120,0.8)" letterSpacing="1">SpO₂</text>
+        <text x="453" y="394" textAnchor="middle" fontFamily="Orbitron" fontWeight="700" fontSize="10" fill="rgba(255,80,100,0.98)">{spo2}%</text>
+        <line x1="453" y1="296" x2="452" y2="300" stroke="rgba(255,60,90,0.4)" strokeWidth={1} strokeDasharray="2,2"/>
 
         {/* Tag peso ESP32 flotante */}
-        <rect x="420" y="295" width="90" height="26" rx="5" fill="rgba(2,12,22,0.88)" stroke="rgba(0,180,255,0.3)" strokeWidth={1}/>
-        <text x="465" y="305" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="5.5" fill="rgba(0,180,255,0.7)" letterSpacing="0.5">HX711</text>
-        <text x="465" y="317" textAnchor="middle" fontFamily="Orbitron" fontWeight="700" fontSize="9" fill="rgba(0,220,255,0.95)">{peso.toFixed(1)} g IV</text>
+        <rect x="478" y="258" width="90" height="26" rx="5" fill="rgba(2,12,22,0.88)" stroke="rgba(0,180,255,0.3)" strokeWidth={1}/>
+        <text x="523" y="266" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="5.5" fill="rgba(0,180,255,0.7)" letterSpacing="0.5">HX711</text>
+        <text x="523" y="278" textAnchor="middle" fontFamily="Orbitron" fontWeight="700" fontSize="9" fill="rgba(0,220,255,0.95)">{peso.toFixed(1)} g IV</text>
 
         {/* Tag FC flotante */}
-        <rect x="376" y="345" width="72" height="26" rx="5" fill="rgba(255,20,50,0.12)" stroke="rgba(255,60,90,0.35)" strokeWidth={1}/>
-        <text x="412" y="355" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="6" fill="rgba(255,100,120,0.8)" letterSpacing="0.5">FREC. CARD.</text>
-        <text x="412" y="367" textAnchor="middle" fontFamily="Orbitron" fontWeight="700" fontSize="9" fill="rgba(255,80,100,0.98)">{bpm} bpm</text>
+        <rect x="415" y="342" width="72" height="26" rx="5" fill="rgba(255,20,50,0.12)" stroke="rgba(255,60,90,0.35)" strokeWidth={1}/>
+        <text x="451" y="352" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="6" fill="rgba(255,100,120,0.8)" letterSpacing="0.5">FREC. CARD.</text>
+        <text x="451" y="363" textAnchor="middle" fontFamily="Orbitron" fontWeight="700" fontSize="9" fill="rgba(255,80,100,0.98)">{bpm} bpm</text>
 
         {/* Cabeza */}
         <rect x="168" y="275" width="22" height="20" fill="#c07858" rx="4"/>
@@ -279,10 +279,10 @@ const EscenaPaciente = ({ lectura }: Props) => {
         <line x1="654"   y1="331.5" x2="665" y2="331.5" stroke="rgba(220,40,40,0.7)" strokeWidth={2}/>
 
         {/* Estetoscopio */}
-        <path d="M632,332 Q622,346 620,363 Q618,378 627,383 Q636,388 639,378 Q641,370 635,366 Q629,362 631,350 Q633,340 641,336"
+        <path d="M639,311 Q630,346 636,366 Q645,366 645,366 Q645,365 645,371 Q645,360 645,370 Q640,370 642,370 Q648,376 652,311 Z"
           fill="none" stroke="#2a3a5a" strokeWidth={3} strokeLinecap="round"/>
-        <circle cx="627" cy="384" r="6" fill="#1a2a4a" stroke="#3a5a8a" strokeWidth={1.2}/>
-        <circle cx="627" cy="384" r="3.5" fill="#4a7ab0"/>
+        <circle cx="641" cy="368" r="6" fill="#1a2a4a" stroke="#3a5a8a" strokeWidth={1.2}/>
+        <circle cx="641" cy="368" r="3.5" fill="#4a7ab0"/>
 
         {/* Brazo izquierdo — extendido hacia el poste IV (señalando/ajustando) */}
         <path d="M621,328 Q608,318 600,310 Q594,303 592,295"
@@ -318,7 +318,6 @@ const EscenaPaciente = ({ lectura }: Props) => {
         <ellipse cx="646" cy="266" rx="27" ry="30" fill="#d4906a" filter="url(#sv-shade)"/>
         {/* Pelo oscuro */}
         <path d="M620,258 Q621,226 646,222 Q671,226 672,258 Q663,240 646,238 Q629,240 620,258 Z" fill="#1a0e08"/>
-        <path d="M620,261 Q618,244 622,233 Q630,220 646,218" fill="none" stroke="#2a1a0c" strokeWidth={3.5} strokeLinecap="round"/>
         {/* Orejas */}
         <ellipse cx="620" cy="268" rx="6" ry="8" fill="#c07858"/>
         <ellipse cx="672" cy="268" rx="6" ry="8" fill="#c07858"/>
