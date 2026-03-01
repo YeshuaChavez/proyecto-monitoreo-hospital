@@ -1,61 +1,98 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Lectura, Alerta } from "../tipos";
-import { API, getLecturas, getAlertas } from "../services/api";
+import { Alerta } from "../tipos";
+import { API, getSuero, getVitales, getAlertas } from "../services/api";
 
 const SIMULAR = false;
 
-function generarLecturaSimulada(prev: Lectura): Lectura {
+// ── Tipos locales alineados con las tablas separadas ──────────
+export interface DatosSuero {
+  id:           number;
+  timestamp:    string;
+  time:         string;
+  peso:         number;
+  bomba:        boolean;
+  estado_suero: string;
+}
+
+export interface DatosVitales {
+  id:             number;
+  timestamp:      string;
+  time:           string;
+  fc:             number;
+  spo2:           number;
+  estado_vitales: string;
+}
+
+// Estado combinado que usa el dashboard para mostrar todo junto
+export interface EstadoLive {
+  // suero
+  peso:          number;
+  bomba:         boolean;
+  estado_suero:  string;
+  // vitales
+  fc:            number;
+  spo2:          number;
+  estado_vitales: string;
+  // meta
+  timestamp:     string;
+}
+
+function generarSimulado(prev: EstadoLive): EstadoLive {
   return {
-    id:             Date.now(),
-    timestamp:      new Date().toISOString(),
-    fc:             Math.max(50, Math.min(130, (prev.fc || 75) + (Math.random() - 0.5) * 6)),
-    spo2:           Math.max(85, Math.min(100, (prev.spo2 || 98) + (Math.random() - 0.5) * 2)),
     peso:           Math.max(0, (prev.peso || 500) - Math.random() * 2),
     bomba:          (prev.peso || 500) < 100,
     estado_suero:   "NORMAL",
-    estado_vitales: null,
+    fc:             Math.max(50, Math.min(130, (prev.fc || 75) + (Math.random() - 0.5) * 6)),
+    spo2:           Math.max(85, Math.min(100, (prev.spo2 || 98) + (Math.random() - 0.5) * 2)),
+    estado_vitales: "NORMAL",
+    timestamp:      new Date().toISOString(),
   };
 }
 
 export function useLecturas() {
-  const [live, setLive] = useState<Lectura>({
-    id: 0, timestamp: "", fc: 0, spo2: 0,
-    peso: 500, bomba: false, estado_suero: "NORMAL", estado_vitales: null,
+  const [live, setLive] = useState<EstadoLive>({
+    peso: 500, bomba: false, estado_suero: "NORMAL",
+    fc: 0, spo2: 0, estado_vitales: "MIDIENDO",
+    timestamp: "",
   });
-  const [historial, setHistorial] = useState<Lectura[]>([]);
-  const [alertas, setAlertas]     = useState<Alerta[]>([]);
-  const [conectado, setConectado] = useState(false);
+
+  // Historial separado por tabla
+  const [historialSuero,   setHistorialSuero]   = useState<DatosSuero[]>([]);
+  const [historialVitales, setHistorialVitales] = useState<DatosVitales[]>([]);
+  const [alertas,          setAlertas]          = useState<Alerta[]>([]);
+  const [conectado,        setConectado]        = useState(false);
 
   const wsRef  = useRef<WebSocket | null>(null);
   const simRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Mantiene los últimos vitales conocidos para no perderlos
-  // cuando llega una actualización de solo suero
-  const ultimosVitalesRef = useRef({ fc: 0, spo2: 0, estado_vitales: null as string | null });
+  // Últimos vitales conocidos — persiste entre actualizaciones de suero
+  const ultimosVitalesRef = useRef<DatosVitales | null>(null);
 
   const cargarHistorial = useCallback(async () => {
     try {
-      const [lects, alts] = await Promise.all([getLecturas(50), getAlertas(20)]);
-      if (lects?.length) {
-        setHistorial(lects);
-        // Buscar la última lectura con vitales válidos para inicializar
-        const ultimaConVitales = [...lects].reverse().find(l => l.fc && l.fc > 0);
-        const ultimaConPeso    = [...lects].reverse().find(l => l.peso !== null);
-        if (ultimaConVitales) {
-          ultimosVitalesRef.current = {
-            fc:             ultimaConVitales.fc,
-            spo2:           ultimaConVitales.spo2,
-            estado_vitales: ultimaConVitales.estado_vitales,
-          };
-        }
-        // Estado inicial combinando última lectura con últimos vitales
-        setLive(prev => ({
-          ...prev,
-          ...(ultimaConPeso    ? { peso: ultimaConPeso.peso, bomba: ultimaConPeso.bomba, estado_suero: ultimaConPeso.estado_suero } : {}),
-          ...(ultimaConVitales ? { fc: ultimaConVitales.fc, spo2: ultimaConVitales.spo2, estado_vitales: ultimaConVitales.estado_vitales } : {}),
-        }));
+      const [suero, vitales, alts] = await Promise.all([
+        getSuero(60),
+        getVitales(60),
+        getAlertas(20),
+      ]);
+
+      if (suero?.length)   setHistorialSuero(suero);
+      if (vitales?.length) {
+        setHistorialVitales(vitales);
+        ultimosVitalesRef.current = vitales[vitales.length - 1];
       }
       if (alts?.length) setAlertas(alts);
+
+      // Estado inicial combinado
+      const ultimoSuero   = suero?.[suero.length - 1];
+      const ultimoVitales = vitales?.[vitales.length - 1];
+
+      setLive(prev => ({
+        ...prev,
+        ...(ultimoSuero   ? { peso: ultimoSuero.peso, bomba: ultimoSuero.bomba, estado_suero: ultimoSuero.estado_suero, timestamp: ultimoSuero.timestamp } : {}),
+        ...(ultimoVitales ? { fc: ultimoVitales.fc, spo2: ultimoVitales.spo2, estado_vitales: ultimoVitales.estado_vitales } : {}),
+      }));
+
     } catch (e) {
       console.warn("Error cargando historial:", e);
     }
@@ -65,8 +102,11 @@ export function useLecturas() {
     if (SIMULAR) {
       simRef.current = setInterval(() => {
         setLive(prev => {
-          const nueva = generarLecturaSimulada(prev);
-          setHistorial(h => [...h.slice(-49), nueva]);
+          const nueva = generarSimulado(prev);
+          setHistorialSuero(h => [...h.slice(-59), {
+            id: Date.now(), timestamp: nueva.timestamp, time: "",
+            peso: nueva.peso, bomba: nueva.bomba, estado_suero: nueva.estado_suero,
+          }]);
           return nueva;
         });
       }, 1000);
@@ -81,58 +121,49 @@ export function useLecturas() {
 
       ws.onopen = () => {
         setConectado(true);
-        console.log("✅ WebSocket conectado a Railway");
+        console.log("✅ WebSocket conectado");
       };
 
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
 
-          // ── Topic lecturas (cada 1s): peso + bomba ──────────
-          // Usa msg.estado.fc/spo2 que el backend mantiene
-          // actualizados con los últimos vitales conocidos
+          // ── Suero (cada 1s) → tabla suero ──────────────────
           if (msg.type === "lectura" && msg.data) {
-            const estado = msg.estado ?? {};
+            const s: DatosSuero = msg.data;
 
-            setLive(prev => {
-              // FC y SpO2: usar los del estado combinado si están disponibles,
-              // sino conservar los últimos conocidos del ref
-              const fc   = estado.fc   && estado.fc   > 0 ? estado.fc   : ultimosVitalesRef.current.fc;
-              const spo2 = estado.spo2 && estado.spo2 > 0 ? estado.spo2 : ultimosVitalesRef.current.spo2;
+            // Actualizar historial de suero
+            setHistorialSuero(h => [...h.slice(-59), s]);
 
-              return {
-                ...prev,
-                id:            msg.data.id        ?? prev.id,
-                timestamp:     msg.data.timestamp ?? prev.timestamp,
-                peso:          msg.data.peso       ?? prev.peso,
-                bomba:         msg.data.bomba      ?? prev.bomba,
-                estado_suero:  msg.data.estado_suero ?? prev.estado_suero,
-                fc,
-                spo2,
-                estado_vitales: ultimosVitalesRef.current.estado_vitales,
-              };
-            });
-
-            // Agregar al historial solo si tiene peso (lectura de suero)
-            if (msg.data.peso !== null && msg.data.peso !== undefined) {
-              setHistorial(h => [...h.slice(-49), msg.data]);
-            }
+            // Actualizar live: peso/bomba del mensaje + fc/spo2 del ref
+            setLive(prev => ({
+              ...prev,
+              peso:          s.peso,
+              bomba:         s.bomba,
+              estado_suero:  s.estado_suero,
+              timestamp:     s.timestamp,
+              // vitales: conservar último promedio conocido
+              fc:   ultimosVitalesRef.current?.fc   ?? prev.fc,
+              spo2: ultimosVitalesRef.current?.spo2 ?? prev.spo2,
+              estado_vitales: ultimosVitalesRef.current?.estado_vitales ?? prev.estado_vitales,
+            }));
           }
 
-          // ── Topic vitales (cada 10s): fc + spo2 promediados ─
+          // ── Vitales (cada 10s) → tabla vitales ─────────────
           if (msg.type === "vitales" && msg.data) {
-            const { fc, spo2, estado_vitales } = msg.data;
+            const v: DatosVitales = msg.data;
 
-            if (fc && fc > 0) {
-              // Actualizar ref de últimos vitales conocidos
-              ultimosVitalesRef.current = { fc, spo2, estado_vitales };
+            if (v.fc > 0) {
+              // Actualizar ref y historial de vitales
+              ultimosVitalesRef.current = v;
+              setHistorialVitales(h => [...h.slice(-59), v]);
 
-              // Hacer merge en live: conservar peso/bomba actuales
+              // Actualizar live: fc/spo2 del promedio + peso/bomba actuales
               setLive(prev => ({
                 ...prev,
-                fc,
-                spo2,
-                estado_vitales,
+                fc:             v.fc,
+                spo2:           v.spo2,
+                estado_vitales: v.estado_vitales,
               }));
             }
           }
@@ -160,9 +191,15 @@ export function useLecturas() {
     }
 
     conectar();
-
     return () => { wsRef.current?.close(); };
   }, [cargarHistorial]);
 
-  return { live, historial, alertas, setAlertas, conectado };
+  return {
+    live,
+    historialSuero,    // para gráfica de peso
+    historialVitales,  // para gráfica de FC/SpO2
+    alertas,
+    setAlertas,
+    conectado,
+  };
 }
