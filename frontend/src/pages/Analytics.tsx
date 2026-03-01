@@ -7,8 +7,8 @@ import { DatosSuero, DatosVitales, EstadoLive } from "../hooks/useLecturas";
 
 interface Props {
   live:             EstadoLive;
-  historialSuero:   DatosSuero[];
-  historialVitales: DatosVitales[];
+  historialSuero?:   DatosSuero[];
+  historialVitales?: DatosVitales[];
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -45,10 +45,10 @@ function detectarAnomalia(tasas: number[]) {
 // ══════════════════════════════════════════════════════════════
 //  COMPONENTE
 // ══════════════════════════════════════════════════════════════
-const Analytics = ({ live, historialSuero, historialVitales }: Props) => {
+const Analytics = ({ live, historialSuero = [], historialVitales = [] }: Props) => {
 
   const mlSuero = useMemo(() => {
-    const datos = historialSuero.filter(d => d.peso > 0).slice(-60);
+    const datos = (historialSuero ?? []).filter(d => d.peso > 0).slice(-60);
     if (datos.length < 5) return null;
     const puntos = datos.map((d, i) => ({ x: i, y: d.peso }));
     const { pendiente, intercepto, r2 } = regresionLineal(puntos);
@@ -80,7 +80,7 @@ const Analytics = ({ live, historialSuero, historialVitales }: Props) => {
   }, [historialSuero]);
 
   const statsV = useMemo(() => {
-    const v = historialVitales.filter(d => d.fc > 0 && d.spo2 > 0);
+    const v = (historialVitales ?? []).filter(d => d.fc > 0 && d.spo2 > 0);
     if (!v.length) return null;
     return {
       promedioFC:   +(v.reduce((a,b) => a+b.fc,   0)/v.length).toFixed(0),
@@ -186,8 +186,10 @@ const Analytics = ({ live, historialSuero, historialVitales }: Props) => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e2436" />
                 <XAxis dataKey="time" tick={{ fontSize:9, fill:"#374151" }} interval={9} />
                 <YAxis domain={[0,600]} tick={{ fontSize:9, fill:"#6b7280" }} />
-                <Tooltip contentStyle={{ background:"rgba(10,14,26,0.95)", border:"1px solid #1e2436", borderRadius:8, fontSize:11, fontFamily:"'JetBrains Mono', monospace" }}
-                  formatter={(val:any, name?:string) => [`${Number(val).toFixed(1)}g`, name==="peso"?"Peso real":"Tendencia ML"] as [string, string]} />
+                <Tooltip
+                  contentStyle={{ background:"rgba(10,14,26,0.95)", border:"1px solid #1e2436", borderRadius:8, fontSize:11, fontFamily:"'JetBrains Mono', monospace" }}
+                  formatter={(val:any, name?:string) => [`${Number(val).toFixed(1)}g`, name==="peso"?"Peso real":"Tendencia ML"] as [string, string]}
+                />
                 <ReferenceLine y={150} stroke="#f59e0b" strokeDasharray="4 2" label={{ value:"ALERTA 150g", position:"right", fontSize:9, fill:"#f59e0b" }} />
                 <ReferenceLine y={100} stroke="#ef4444" strokeDasharray="4 2" label={{ value:"CRÍTICO 100g", position:"right", fontSize:9, fill:"#ef4444" }} />
                 <Area type="monotone" dataKey="peso"      stroke="#a78bfa" strokeWidth={2} fill="url(#gradPeso)" dot={false} name="peso" />
@@ -211,7 +213,7 @@ const Analytics = ({ live, historialSuero, historialVitales }: Props) => {
       {/* ── VITALES ──────────────────────────────────────────── */}
       <SectionLabel text="SIGNOS VITALES — HISTORIAL" color="#00e5ff" />
 
-      {statsV && historialVitales.length > 0 ? (
+      {statsV && (historialVitales ?? []).length > 0 ? (
         <>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:12, marginBottom:16 }}>
             {[
