@@ -215,18 +215,6 @@ const Config = () => {
           {guardando ? "Enviando al ESP32..." : "💾 GUARDAR Y APLICAR"}
         </button>
       </div>
-
-      {/* Info */}
-      <div style={{
-        marginTop: 16, padding: "12px 16px",
-        background: "rgba(13,17,28,0.5)",
-        border: "1px solid rgba(255,255,255,0.04)",
-        borderRadius: 10, fontSize: 11, color: "#4b5563",
-        fontFamily: "'JetBrains Mono', monospace",
-      }}>
-        ℹ️ El ESP32 recibe los nuevos umbrales vía MQTT (topic: posta/consultorio/config)
-        y los aplica inmediatamente sin necesidad de reiniciar.
-      </div>
     </div>
   );
 };
