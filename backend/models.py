@@ -1,7 +1,6 @@
 """
 Modelos SQLAlchemy → tablas MySQL
 """
-
 from datetime import datetime
 from sqlalchemy import Column, Integer, Float, Boolean, String, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
@@ -18,7 +17,6 @@ class Usuario(Base):
     rol      = Column(String(50), nullable=False)
     activo   = Column(Boolean, default=True)
 
-    # Relación inversa — pacientes asignados a este doctor/enfermero
     pacientes = relationship("Paciente", back_populates="doctor")
 
     def to_dict(self):
@@ -37,10 +35,7 @@ class Paciente(Base):
     nombre            = Column(String(100), nullable=False)
     apellido          = Column(String(100), nullable=False)
     codigo            = Column(String(20),  nullable=True)
-
-    # FK al médico/enfermero asignado (nunca admin)
     doctor_id         = Column(Integer, ForeignKey("usuarios.id"), nullable=True, index=True)
-
     grupo_sanguineo   = Column(String(5),   nullable=True)
     fecha_nacimiento  = Column(String(20),  nullable=True)
     fecha_ingreso     = Column(String(20),  nullable=True)
@@ -49,9 +44,7 @@ class Paciente(Base):
     contacto_telefono = Column(String(20),  nullable=True)
     contacto_relacion = Column(String(50),  nullable=True)
     activo            = Column(Boolean, default=True)
-    created_at        = Column(DateTime, default=datetime.utcnow)
 
-    # Relación con usuario (doctor/enfermero)
     doctor = relationship("Usuario", back_populates="pacientes", lazy="joined")
 
     def to_dict(self):
@@ -60,9 +53,7 @@ class Paciente(Base):
             "nombre":            self.nombre,
             "apellido":          self.apellido,
             "codigo":            self.codigo,
-            # Para mostrar en tabla y ficha del paciente
             "doctor":            self.doctor.nombre if self.doctor else "",
-            # Para preseleccionar el dropdown al editar
             "doctor_id":         self.doctor_id,
             "grupo_sanguineo":   self.grupo_sanguineo   or "",
             "fecha_nacimiento":  self.fecha_nacimiento  or "",
@@ -72,9 +63,7 @@ class Paciente(Base):
             "contacto_telefono": self.contacto_telefono  or "",
             "contacto_relacion": self.contacto_relacion  or "",
             "activo":            self.activo,
-            "created_at":        self.created_at.isoformat() if self.created_at else None,
         }
-
 
 class Suero(Base):
     __tablename__ = "suero"
