@@ -82,7 +82,7 @@ async def ejecutar_comando(cmd: str):
         async with aiohttp.ClientSession() as session:
             res = await session.post(
                 f"{BACKEND_URL}/comandos",
-                json={"cmd": cmd},
+                json={"cmd": cmd, "origen": "telegram"},  # ← solo esto cambia
                 headers={"Content-Type": "application/json"},
             )
             data = await res.json()

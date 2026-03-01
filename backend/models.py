@@ -15,20 +15,22 @@ from database import Base
 class Suero(Base):
     __tablename__ = "suero"
 
-    id           = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    timestamp    = Column(DateTime, default=datetime.utcnow, index=True)
-    peso         = Column(Float,   nullable=False)
-    bomba        = Column(Boolean, default=False)
-    estado_suero = Column(String(20), nullable=True)  # NORMAL/ALERTA/CRITICO/RECARGANDO
+    id             = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    timestamp      = Column(DateTime, default=datetime.utcnow, index=True)
+    peso           = Column(Float,    nullable=False)
+    bomba          = Column(Boolean,  default=False)
+    estado_suero   = Column(String(20), nullable=True)
+    origen_comando = Column(String(20), nullable=True)  # dashboard | telegram | voz | automatico | NULL
 
     def to_dict(self):
         return {
-            "id":           self.id,
-            "timestamp":    self.timestamp.isoformat() if self.timestamp else None,
-            "time":         self.timestamp.strftime("%H:%M:%S") if self.timestamp else "--",
-            "peso":         round(self.peso, 1) if self.peso is not None else 0,
-            "bomba":        self.bomba or False,
-            "estado_suero": self.estado_suero or "NORMAL",
+            "id":             self.id,
+            "timestamp":      self.timestamp.isoformat() if self.timestamp else None,
+            "time":           self.timestamp.strftime("%H:%M:%S") if self.timestamp else "--",
+            "peso":           round(self.peso, 1) if self.peso is not None else 0,
+            "bomba":          self.bomba or False,
+            "estado_suero":   self.estado_suero   or "NORMAL",
+            "origen_comando": self.origen_comando,  # None si no fue comando
         }
 
 
@@ -71,4 +73,20 @@ class Alerta(Base):
             "mensaje":   self.mensaje,
             "valor":     self.valor,
             "activa":    self.activa,
+        }
+    
+class Config(Base):
+    __tablename__ = "config"
+
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    peso_alerta      = Column(Float, default=150.0)   # amarillo
+    peso_critico     = Column(Float, default=100.0)   # rojo / bomba ON
+    updated_at       = Column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id":           self.id,
+            "peso_alerta":  self.peso_alerta,
+            "peso_critico": self.peso_critico,
+            "updated_at":   self.updated_at.isoformat() if self.updated_at else None,
         }

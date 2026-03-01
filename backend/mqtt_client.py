@@ -17,6 +17,8 @@ from database import SessionLocal
 from models import Suero, Vitales, Alerta
 from telegram_bot import enviar_alerta, construir_mensaje
 
+from database import get_config
+
 # ── Credenciales HiveMQ ───────────────────────────────────────
 MQTT_HOST   = os.environ.get("MQTT_HOST",   "fd3a3baad98a46c3a2a0caabe973c4b3.s1.eu.hivemq.cloud")
 MQTT_PORT   = int(os.environ.get("MQTT_PORT", "8883"))
@@ -27,13 +29,12 @@ MQTT_CLIENT = os.environ.get("MQTT_CLIENT", "FastAPI_Backend")
 TOPIC_LECTURAS = "posta/consultorio/lecturas"
 TOPIC_VITALES  = "posta/consultorio/vitales"
 TOPIC_COMANDOS = "posta/consultorio/comandos"
+TOPIC_CONFIG = "posta/consultorio/config"
 
 # ── Umbrales alertas ──────────────────────────────────────────
 UMBRAL_FC_ALTA       = 100
 UMBRAL_FC_BAJA       = 60
 UMBRAL_SPO2          = 95
-UMBRAL_SUERO_ALERTA  = 150.0
-UMBRAL_SUERO_CRITICO = 100.0
 
 # ── Anti-spam Telegram ────────────────────────────────────────
 INTERVALO_TELEGRAM = 15
@@ -55,20 +56,25 @@ class MQTTManager:
             "spo2":           0,
             "estado_vitales": "MIDIENDO",
         }
+        self.ultimo_origen: str = "automatico"
 
     # ── Guardar en tabla suero ────────────────────────────────
     def _guardar_suero(self, peso: float, bomba: bool, estado_suero: str) -> Suero:
         db = SessionLocal()
         try:
             registro = Suero(
-                timestamp    = datetime.utcnow() - timedelta(hours=5),
-                peso         = peso,
-                bomba        = bomba,
-                estado_suero = estado_suero,
+                timestamp      = datetime.utcnow() - timedelta(hours=5),
+                peso           = peso,
+                bomba          = bomba,
+                estado_suero   = estado_suero,
+                origen_comando = self.ultimo_origen if bomba else None,  # solo guarda si bomba=true
             )
             db.add(registro)
             db.commit()
             db.refresh(registro)
+            # Resetear origen después de guardar
+            if bomba:
+                self.ultimo_origen = "automatico"
             return registro
         finally:
             db.close()
@@ -92,19 +98,23 @@ class MQTTManager:
 
     # ── Alertas de suero ──────────────────────────────────────
     def _alertas_suero(self, peso: float, bomba: bool) -> list:
+        cfg = get_config()  # ← lee de BD cada vez
+        umbral_alerta  = cfg["peso_alerta"]
+        umbral_critico = cfg["peso_critico"]
+
         db = SessionLocal()
         try:
             alertas = []
-            if peso <= UMBRAL_SUERO_CRITICO:
+            if peso <= umbral_critico:
                 alertas.append(Alerta(
                     tipo    = "SUERO_CRITICO",
-                    mensaje = f"Nivel crítico de suero: {peso:.1f}g — bomba activada",
+                    mensaje = f"Nivel crítico de suero: {peso:.1f}g — bomba activada (umbral: {umbral_critico}g)",
                     valor   = peso,
                 ))
-            elif peso <= UMBRAL_SUERO_ALERTA:
+            elif peso <= umbral_alerta:
                 alertas.append(Alerta(
                     tipo    = "SUERO_BAJO",
-                    mensaje = f"Nivel bajo de suero: {peso:.1f}g",
+                    mensaje = f"Nivel bajo de suero: {peso:.1f}g (umbral alerta: {umbral_alerta}g)",
                     valor   = peso,
                 ))
             if bomba:
@@ -151,6 +161,16 @@ class MQTTManager:
             return [a.to_dict() for a in alertas]
         finally:
             db.close()
+
+    # ── Publicar configuración al ESP32 ─────────────────────────
+    async def publicar_config(self, peso_alerta: float, peso_critico: float):
+        """Publica nuevos umbrales al ESP32 por MQTT."""
+        payload = json.dumps({
+            "peso_alerta":  peso_alerta,
+            "peso_critico": peso_critico,
+        })
+        await self._cola_comandos.put(f"__config__{payload}")
+        print(f"📤 Config enviada → alerta:{peso_alerta}g crítico:{peso_critico}g")
 
     # ── Telegram anti-spam ────────────────────────────────────
     async def _enviar_telegram_si_aplica(self, payload_completo: dict, alertas: list):
@@ -279,5 +299,9 @@ class MQTTManager:
     async def _enviar_comandos(self, client):
         while True:
             cmd = await self._cola_comandos.get()
-            await client.publish(TOPIC_COMANDOS, json.dumps({"cmd": cmd}), qos=1)
-            print(f"📤 Comando enviado: {cmd}")
+            if cmd.startswith("__config__"):
+                payload = cmd.replace("__config__", "")
+                await client.publish(TOPIC_CONFIG, payload, qos=1)
+            else:
+                await client.publish(TOPIC_COMANDOS, json.dumps({"cmd": cmd}), qos=1)
+            print(f"📤 Enviado: {cmd}")

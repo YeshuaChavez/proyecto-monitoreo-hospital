@@ -33,3 +33,15 @@ def init_db():
     from models import Suero, Vitales, Alerta  # tablas separadas
     Base.metadata.create_all(bind=engine)
     print("✅ Base de datos inicializada")
+
+def get_config() -> dict:
+    """Retorna la configuración activa o valores por defecto."""
+    from models import Config
+    db = SessionLocal()
+    try:
+        cfg = db.query(Config).order_by(Config.id.desc()).first()
+        if cfg:
+            return {"peso_alerta": cfg.peso_alerta, "peso_critico": cfg.peso_critico}
+        return {"peso_alerta": 150.0, "peso_critico": 100.0}
+    finally:
+        db.close()

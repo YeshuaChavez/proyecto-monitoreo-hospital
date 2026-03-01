@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from database import SessionLocal, init_db
-from models import Suero, Vitales, Alerta
+from models import Suero, Vitales, Alerta, Config
 from mqtt_client import MQTTManager
 from telegram_bot import polling
 
@@ -222,7 +222,8 @@ def limpiar_alertas():
 #  REST — COMANDOS
 # ═══════════════════════════════════════════════════════════════
 class ComandoRequest(BaseModel):
-    cmd: str
+    cmd:    str
+    origen: str = "dashboard"  # dashboard | telegram | voz
 
 COMANDOS_VALIDOS = {"bomba_on", "bomba_off", "reset"}
 
@@ -230,6 +231,10 @@ COMANDOS_VALIDOS = {"bomba_on", "bomba_off", "reset"}
 async def enviar_comando(body: ComandoRequest):
     if body.cmd not in COMANDOS_VALIDOS:
         raise HTTPException(status_code=400, detail=f"Comando inválido. Válidos: {COMANDOS_VALIDOS}")
+    
+    # Guardar origen para que _guardar_suero lo use en el próximo ciclo
+    mqtt_manager.ultimo_origen = body.origen
+    
     await mqtt_manager.publicar_comando(body.cmd)
     return {"ok": True, "cmd": body.cmd, "timestamp": datetime.utcnow().isoformat()}
 
@@ -250,6 +255,59 @@ async def enviar_email_endpoint(body: EmailRequest):
         destinatario = body.destinatario,
     )
     return {"ok": True, "destinatario": body.destinatario}
+
+# ═══════════════════════════════════════════════════════════════
+#  REST — LECTURA CONFIGURACIÓN Y ACTUALIZAR UMBRALES
+# ═══════════════════════════════════════════════════════════════
+class ConfigRequest(BaseModel):
+    peso_alerta:  float
+    peso_critico: float
+
+@app.get("/config")
+def get_configuracion():
+    """Obtiene la configuración activa de umbrales."""
+    db = SessionLocal()
+    try:
+        cfg = db.query(Config).order_by(Config.id.desc()).first()
+        if cfg:
+            return cfg.to_dict()
+        return {"peso_alerta": 150.0, "peso_critico": 100.0}
+    finally:
+        db.close()
+
+@app.post("/config")
+async def guardar_configuracion(body: ConfigRequest):
+    """Guarda nuevos umbrales y los envía al ESP32 por MQTT."""
+    # Validar rangos
+    if body.peso_critico >= body.peso_alerta:
+        raise HTTPException(
+            status_code=400,
+            detail="El umbral crítico debe ser menor que el de alerta"
+        )
+    if body.peso_critico < 10 or body.peso_alerta > 490:
+        raise HTTPException(
+            status_code=400,
+            detail="Umbrales fuera de rango (crítico: 10-490g, alerta: 10-490g)"
+        )
+
+    # Guardar en BD
+    db = SessionLocal()
+    try:
+        cfg = Config(
+            peso_alerta  = body.peso_alerta,
+            peso_critico = body.peso_critico,
+            updated_at   = datetime.utcnow() - timedelta(hours=5),
+        )
+        db.add(cfg)
+        db.commit()
+        db.refresh(cfg)
+    finally:
+        db.close()
+
+    # Enviar al ESP32 por MQTT
+    await mqtt_manager.publicar_config(body.peso_alerta, body.peso_critico)
+
+    return {"ok": True, "config": cfg.to_dict()}
 
 # ═══════════════════════════════════════════════════════════════
 #  REST — STATS
