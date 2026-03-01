@@ -218,8 +218,8 @@ const EscenaPaciente = ({ lectura }: Props) => {
 
         {/* Tag peso ESP32 flotante */}
         <rect x="478" y="258" width="90" height="26" rx="5" fill="rgba(2,12,22,0.88)" stroke="rgba(0,180,255,0.3)" strokeWidth={1}/>
-        <text x="523" y="266" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="5.5" fill="rgba(0,180,255,0.7)" letterSpacing="0.5">HX711</text>
-        <text x="523" y="278" textAnchor="middle" fontFamily="Orbitron" fontWeight="700" fontSize="9" fill="rgba(0,220,255,0.95)">{peso.toFixed(1)} g IV</text>
+        <text x="525" y="266" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="5.5" fill="rgba(0,180,255,0.7)" letterSpacing="0.5">HX711</text>
+        <text x="525" y="278" textAnchor="middle" fontFamily="Orbitron" fontWeight="700" fontSize="9" fill="rgba(0,220,255,0.95)">{peso.toFixed(1)} g IV</text>
 
         {/* Tag FC flotante */}
         <rect x="415" y="342" width="72" height="26" rx="5" fill="rgba(255,20,50,0.12)" stroke="rgba(255,60,90,0.35)" strokeWidth={1}/>
@@ -349,17 +349,17 @@ const EscenaPaciente = ({ lectura }: Props) => {
         <text x="646" y="220" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="6.5" fill="rgba(0,200,255,0.7)"  letterSpacing="0.5">DR. PAREDES</text>
         <text x="646" y="230" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="6"   fill="rgba(0,229,255,0.45)" letterSpacing="0.3">TURNO MAÑANA</text>
         {/* Monitor ECG en mesita */}
-        <rect x="48" y="368" width="84" height="64" fill="#0a1e30" rx="5" stroke="#0d2a40" strokeWidth={1}/>
-        <rect x="50" y="370" width="80" height="58" fill="#060f1a" rx="4"/>
-        <rect x="52" y="372" width="76" height="38" fill="#020f08" rx="3"/>
-        <text x="90" y="382" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="6" fill="rgba(0,200,80,0.5)" letterSpacing="1">Estado BPM</text>
+        <rect x="275" y="204" width="84" height="64" fill="#0a1e30" rx="5" stroke="#0d2a40" strokeWidth={1}/>
+        <rect x="277" y="206" width="80" height="58" fill="#060f1a" rx="4"/>
+        <rect x="279" y="210" width="76" height="38" fill="#020f08" rx="3"/>
+        <text x="318" y="217" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="6" fill="rgba(0,200,80,0.5)" letterSpacing="1">Estado BPM</text>
         <polyline
-          points="54,398 60,398 63,386 66,411 69,398 76,398 83,398 90,398 97,398 104,398 110,398 122,398"
+          points="281,233 287,233 290,228 292,233 295,220 298,245 301,233 307,233 313,233 319,233 325,233 331,233 337,233 343,233 349,233 353,233"
           fill="none" stroke="rgba(0,220,80,0.85)" strokeWidth={1.3} strokeLinecap="round"/>
-        <text x="90" y="416" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="7" fill="rgba(0,200,80,0.65)">{bpm} BPM</text>
-        <rect x="56"  y="432" width="6" height="28" fill="#0a1e30" rx="2"/>
-        <rect x="84"  y="432" width="6" height="28" fill="#0a1e30" rx="2"/>
-        <rect x="112" y="432" width="6" height="28" fill="#0a1e30" rx="2"/>
+        <text x="318" y="260" textAnchor="middle" fontFamily="Share Tech Mono" fontSize="11" fill="rgba(0,200,80,0.65)">{bpm} BPM</text>
+        <rect x="289"  y="268" width="6" height="28" fill="#0a1e30" rx="2"/>
+        <rect x="314"  y="268" width="6" height="28" fill="#0a1e30" rx="2"/>
+        <rect x="339"  y="268" width="6" height="28" fill="#0a1e30" rx="2"/>
 
       </svg>
     </div>
