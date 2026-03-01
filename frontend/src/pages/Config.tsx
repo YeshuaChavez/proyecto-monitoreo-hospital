@@ -1,12 +1,25 @@
 import { useState, useEffect } from "react";
-import { getConfig, guardarConfig } from "../services/api";
+import { getConfig, guardarConfig, loginUsuario } from "../services/api";
+import { UsuarioLogin } from "../tipos";
 
-const Config = () => {
+interface Props {
+  usuarioActual: UsuarioLogin;
+}
+
+const Config = ({ usuarioActual }: Props) => {
   const [pesoAlerta,   setPesoAlerta]   = useState(150);
   const [pesoCritico,  setPesoCritico]  = useState(100);
   const [guardando,    setGuardando]    = useState(false);
   const [resultado,    setResultado]    = useState<string | null>(null);
   const [cargando,     setCargando]     = useState(true);
+
+  // Modal confirmación
+  const [modalAbierto,  setModalAbierto]  = useState(false);
+  const [passConfirm,   setPassConfirm]   = useState("");
+  const [errorConfirm,  setErrorConfirm]  = useState("");
+  const [verificando,   setVerificando]   = useState(false);
+  const [focusPass,     setFocusPass]     = useState(false);
+  const [mostrarPass,   setMostrarPass]   = useState(false);
 
   useEffect(() => {
     getConfig().then(cfg => {
@@ -16,20 +29,40 @@ const Config = () => {
     });
   }, []);
 
-  const handleGuardar = async () => {
+  // Abre el modal antes de guardar
+  const handleClickGuardar = () => {
     if (pesoCritico >= pesoAlerta) {
       setResultado("❌ El umbral crítico debe ser menor que el de alerta");
       return;
     }
-    setGuardando(true);
-    setResultado(null);
+    setPassConfirm("");
+    setErrorConfirm("");
+    setMostrarPass(false);
+    setModalAbierto(true);
+  };
+
+  // Confirma con contraseña y guarda
+  const handleConfirmar = async () => {
+    if (!passConfirm) {
+      setErrorConfirm("Ingresa tu contraseña");
+      return;
+    }
+    setVerificando(true);
+    setErrorConfirm("");
     try {
+      // Verifica contraseña contra la BD
+      await loginUsuario(usuarioActual.usuario, passConfirm);
+      // Si no lanzó error, contraseña correcta → guardar
+      setModalAbierto(false);
+      setGuardando(true);
+      setResultado(null);
       await guardarConfig(pesoAlerta, pesoCritico);
       setResultado("✅ Configuración guardada y enviada al ESP32");
       setTimeout(() => setResultado(null), 3000);
     } catch {
-      setResultado("❌ Error al guardar configuración");
+      setErrorConfirm("Contraseña incorrecta");
     } finally {
+      setVerificando(false);
       setGuardando(false);
     }
   };
@@ -97,7 +130,6 @@ const Config = () => {
               g
             </span>
           </div>
-          {/* Slider */}
           <input
             type="range" min={50} max={490} step={10}
             value={pesoAlerta}
@@ -154,20 +186,17 @@ const Config = () => {
             marginBottom: 10 }}>PREVIEW — BARRA DE FLUIDO IV</div>
           <div style={{ position: "relative", height: 20, borderRadius: 10,
             background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
-            {/* Zona crítica */}
             <div style={{
               position: "absolute", left: 0,
               width: `${(pesoCritico / 500) * 100}%`,
               height: "100%", background: "rgba(239,68,68,0.4)",
             }}/>
-            {/* Zona alerta */}
             <div style={{
               position: "absolute",
               left: `${(pesoCritico / 500) * 100}%`,
               width: `${((pesoAlerta - pesoCritico) / 500) * 100}%`,
               height: "100%", background: "rgba(245,158,11,0.4)",
             }}/>
-            {/* Zona normal */}
             <div style={{
               position: "absolute",
               left: `${(pesoAlerta / 500) * 100}%`,
@@ -199,7 +228,7 @@ const Config = () => {
 
         {/* Botón guardar */}
         <button
-          onClick={handleGuardar}
+          onClick={handleClickGuardar}
           disabled={guardando}
           style={{
             width: "100%",
@@ -212,9 +241,216 @@ const Config = () => {
             fontFamily: "'JetBrains Mono', monospace",
             letterSpacing: "0.06em",
           }}>
-          {guardando ? "Enviando al ESP32..." : "💾 GUARDAR Y APLICAR"}
+          {guardando ? "Enviando al ESP32..." : "💾 GUARDAR"}
         </button>
       </div>
+
+      {/* ── MODAL CONFIRMACIÓN ── */}
+      {modalAbierto && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 999,
+          background: "rgba(0,0,0,0.75)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          backdropFilter: "blur(4px)",
+        }}>
+          <div style={{
+            background: "#0d111c",
+            border: "1px solid rgba(245,158,11,0.25)",
+            borderRadius: 16, padding: "32px 28px",
+            width: "100%", maxWidth: 380,
+            position: "relative",
+            boxShadow: "0 0 60px rgba(245,158,11,0.08)",
+          }}>
+            {/* Top accent */}
+            <div style={{
+              position: "absolute", top: 0, left: 0, right: 0, height: 2,
+              background: "linear-gradient(90deg,transparent,#f59e0b,transparent)",
+              borderRadius: "16px 16px 0 0",
+            }}/>
+
+            {/* Icono */}
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: 14, margin: "0 auto 14px",
+                background: "rgba(245,158,11,0.08)",
+                border: "1px solid rgba(245,158,11,0.2)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="11" width="18" height="11" rx="2" stroke="#f59e0b" strokeWidth="1.8"/>
+                  <path d="M7 11V7a5 5 0 0110 0v4" stroke="#f59e0b" strokeWidth="1.8" strokeLinecap="round"/>
+                  <circle cx="12" cy="16" r="1.5" fill="#f59e0b"/>
+                </svg>
+              </div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 6px", color: "#f1f5f9" }}>
+                Confirmar cambios
+              </h3>
+              <p style={{ fontSize: 11, color: "#6b7280", margin: 0, fontFamily: "'JetBrains Mono', monospace" }}>
+                Ingresa tu contraseña para aplicar
+              </p>
+            </div>
+
+            {/* Resumen cambios */}
+            <div style={{
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid rgba(255,255,255,0.05)",
+              borderRadius: 8, padding: "10px 14px", marginBottom: 18,
+              fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
+            }}>
+              <div style={{ color: "#6b7280", marginBottom: 6 }}>CAMBIOS A APLICAR</div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ color: "#f59e0b" }}>⚠️ Umbral alerta</span>
+                <span style={{ color: "#e2e8f0", fontWeight: 700 }}>{pesoAlerta} g</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "#ef4444" }}>🚨 Umbral crítico</span>
+                <span style={{ color: "#e2e8f0", fontWeight: 700 }}>{pesoCritico} g</span>
+              </div>
+            </div>
+
+            {/* Usuario */}
+            <div style={{
+              fontSize: 10, color: "#4b5563",
+              fontFamily: "'JetBrains Mono', monospace",
+              marginBottom: 10,
+            }}>
+              USUARIO: <span style={{ color: "#00e5ff" }}>{usuarioActual.usuario}</span>
+              {" · "}{usuarioActual.rol}
+            </div>
+
+            {/* Input contraseña */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{
+                fontSize: 10, color: "#6b7280",
+                fontFamily: "'JetBrains Mono', monospace",
+                letterSpacing: "0.1em", display: "block", marginBottom: 7,
+              }}>
+                CONTRASEÑA
+              </label>
+              <div style={{ position: "relative" }}>
+                <div style={{
+                  position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)",
+                  color: focusPass ? "#f59e0b" : "#374151",
+                  transition: "color 0.2s", pointerEvents: "none",
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/>
+                    <path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <input
+                  type={mostrarPass ? "text" : "password"}
+                  value={passConfirm}
+                  onChange={e => { setPassConfirm(e.target.value); setErrorConfirm(""); }}
+                  onFocus={() => setFocusPass(true)}
+                  onBlur={() => setFocusPass(false)}
+                  onKeyDown={e => e.key === "Enter" && handleConfirmar()}
+                  placeholder="Tu contraseña"
+                  autoFocus
+                  style={{
+                    width: "100%", boxSizing: "border-box",
+                    background: "rgba(255,255,255,0.03)",
+                    border: `1px solid ${errorConfirm ? "rgba(239,68,68,0.5)" : focusPass ? "rgba(245,158,11,0.5)" : "rgba(255,255,255,0.08)"}`,
+                    boxShadow: focusPass && !errorConfirm ? "0 0 0 3px rgba(245,158,11,0.07)" : "none",
+                    color: "#e2e8f0", borderRadius: 8,
+                    padding: "11px 40px 11px 38px",
+                    fontSize: 13, outline: "none",
+                    fontFamily: "'DM Sans', sans-serif",
+                    transition: "border-color 0.2s, box-shadow 0.2s",
+                  }}
+                />
+                <button
+                  onClick={() => setMostrarPass(v => !v)}
+                  style={{
+                    position: "absolute", right: 11, top: "50%", transform: "translateY(-50%)",
+                    background: "none", border: "none",
+                    color: mostrarPass ? "#f59e0b" : "#4b5563",
+                    cursor: "pointer", padding: 4, transition: "color 0.2s",
+                  }}
+                >
+                  {mostrarPass ? (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22"
+                        stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                  ) : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2"/>
+                      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              {/* Error contraseña */}
+              {errorConfirm && (
+                <div style={{
+                  marginTop: 8, fontSize: 11, color: "#ef4444",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  display: "flex", alignItems: "center", gap: 6,
+                }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                    <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  {errorConfirm}
+                </div>
+              )}
+            </div>
+
+            {/* Botones */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={handleConfirmar}
+                disabled={verificando}
+                style={{
+                  flex: 1,
+                  background: verificando ? "rgba(245,158,11,0.04)" : "rgba(245,158,11,0.12)",
+                  border: `1px solid ${verificando ? "rgba(245,158,11,0.1)" : "rgba(245,158,11,0.4)"}`,
+                  color: verificando ? "#4b5563" : "#f59e0b",
+                  borderRadius: 8, padding: "11px 0",
+                  fontSize: 12, fontWeight: 700,
+                  cursor: verificando ? "not-allowed" : "pointer",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  transition: "all 0.2s",
+                }}>
+                {verificando ? (
+                  <>
+                    <div style={{
+                      width: 12, height: 12,
+                      border: "2px solid rgba(245,158,11,0.3)",
+                      borderTopColor: "#f59e0b",
+                      borderRadius: "50%",
+                      animation: "spin 0.7s linear infinite",
+                    }}/>
+                    VERIFICANDO...
+                  </>
+                ) : "✓ CONFIRMAR"}
+              </button>
+
+              <button
+                onClick={() => { setModalAbierto(false); setPassConfirm(""); setErrorConfirm(""); }}
+                disabled={verificando}
+                style={{
+                  flex: 1,
+                  background: "rgba(107,114,128,0.07)",
+                  border: "1px solid rgba(107,114,128,0.2)",
+                  color: "#6b7280",
+                  borderRadius: 8, padding: "11px 0",
+                  fontSize: 12, cursor: verificando ? "not-allowed" : "pointer",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  transition: "all 0.2s",
+                }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Spinner keyframe */}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };

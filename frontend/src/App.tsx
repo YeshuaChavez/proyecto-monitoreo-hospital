@@ -44,7 +44,7 @@ function App() {
         {tab === "analytics"  && <Analytics live={live} historialVitales={historialVitales} historialSuero={historialSuero} />}
         {tab === "paciente"   && <Paciente  live={live} alertas={alertas} />}
         {tab === "alertas"    && <Alertas   alertas={alertas} limpiarAlertas={() => setAlertas([])} />}
-        {tab === "config"     && <Config />}  {/* ← nuevo */}
+        {tab === "config" && <Config usuarioActual={usuarioActual} />}
       </main>
 
       <footer style={{

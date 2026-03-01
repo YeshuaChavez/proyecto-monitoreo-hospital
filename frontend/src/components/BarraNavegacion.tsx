@@ -43,7 +43,7 @@ const BarraNavegacion = ({ tab, setTab, alertas, conectado }: Props) => {
                     { key: "overview", label: "Monitor" },
                     { key: "analytics", label: "Analytics" },
                     { key: "alertas", label: "Alertas" },
-                    { key: "config", label: "Config" },
+                    { key: "config", label: "Configuración" },
                 ].map(({ key, label }) => (
                     <button key={key} onClick={() => setTab(key)} style={{
                         background: tab === key ? "rgba(0,229,255,0.12)" : "transparent",
