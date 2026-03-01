@@ -1,6 +1,6 @@
 """
 =============================================================
- MONITOR IoT HOSPITALARIO — Backend FastAPI
+ MONITOR IoT — POSTA MÉDICA
  UNMSM FISI 2026
 =============================================================
 """
@@ -20,10 +20,8 @@ from models import Suero, Vitales, Alerta
 from mqtt_client import MQTTManager
 from telegram_bot import polling
 
-# ── Singleton MQTT ────────────────────────────────────────────
 mqtt_manager = MQTTManager()
 
-# ── WebSocket manager ─────────────────────────────────────────
 class ConnectionManager:
     def __init__(self):
         self.active: list[WebSocket] = []
@@ -49,7 +47,6 @@ class ConnectionManager:
 
 ws_manager = ConnectionManager()
 
-# ── Lifespan ──────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -64,9 +61,9 @@ async def lifespan(app: FastAPI):
     except asyncio.CancelledError:
         pass
 
-# ── App ───────────────────────────────────────────────────────
 app = FastAPI(
-    title="Monitor IoT Hospitalario",
+    title="Monitor IoT Posta Médica",
+    description="UNMSM FISI 2026 — Consultorio General",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -88,8 +85,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         db = SessionLocal()
         try:
-            # Enviar último suero y últimos vitales al conectar
-            ultimo_suero   = db.query(Suero).order_by(Suero.id.desc()).first()
+            ultimo_suero    = db.query(Suero).order_by(Suero.id.desc()).first()
             ultimos_vitales = db.query(Vitales).order_by(Vitales.id.desc()).first()
 
             if ultimo_suero:
@@ -124,14 +120,13 @@ async def websocket_endpoint(websocket: WebSocket):
 # ═══════════════════════════════════════════════════════════════
 @app.get("/")
 def root():
-    return {"status": "ok", "service": "Monitor IoT Hospitalario UNMSM"}
+    return {"status": "ok", "service": "Monitor IoT Posta Médica — UNMSM FISI 2026"}
 
 # ═══════════════════════════════════════════════════════════════
-#  REST — SUERO (tabla suero)
+#  REST — SUERO
 # ═══════════════════════════════════════════════════════════════
 @app.get("/suero")
 def get_suero(limit: int = 60):
-    """Últimas N lecturas de suero para gráfica de peso."""
     db = SessionLocal()
     try:
         rows = db.query(Suero).order_by(Suero.id.desc()).limit(limit).all()
@@ -157,19 +152,17 @@ def get_suero_rango(desde: str, hasta: str):
         rows = (
             db.query(Suero)
             .filter(Suero.timestamp >= desde, Suero.timestamp <= hasta)
-            .order_by(Suero.timestamp)
-            .all()
+            .order_by(Suero.timestamp).all()
         )
         return [r.to_dict() for r in rows]
     finally:
         db.close()
 
 # ═══════════════════════════════════════════════════════════════
-#  REST — VITALES (tabla vitales)
+#  REST — VITALES
 # ═══════════════════════════════════════════════════════════════
 @app.get("/vitales")
 def get_vitales(limit: int = 60):
-    """Últimas N lecturas de vitales promediados para gráfica FC/SpO2."""
     db = SessionLocal()
     try:
         rows = db.query(Vitales).order_by(Vitales.id.desc()).limit(limit).all()
@@ -195,8 +188,7 @@ def get_vitales_rango(desde: str, hasta: str):
         rows = (
             db.query(Vitales)
             .filter(Vitales.timestamp >= desde, Vitales.timestamp <= hasta)
-            .order_by(Vitales.timestamp)
-            .all()
+            .order_by(Vitales.timestamp).all()
         )
         return [r.to_dict() for r in rows]
     finally:
@@ -266,18 +258,18 @@ async def enviar_email_endpoint(body: EmailRequest):
 def get_stats():
     db = SessionLocal()
     try:
-        total_suero   = db.query(Suero).count()
-        total_vitales = db.query(Vitales).count()
+        total_suero     = db.query(Suero).count()
+        total_vitales   = db.query(Vitales).count()
         alertas_activas = db.query(Alerta).filter(Alerta.activa == True).count()
         ultimo_suero    = db.query(Suero).order_by(Suero.id.desc()).first()
         ultimos_vitales = db.query(Vitales).order_by(Vitales.id.desc()).first()
         return {
-            "total_suero":      total_suero,
-            "total_vitales":    total_vitales,
-            "alertas_activas":  alertas_activas,
-            "ultimo_suero":     ultimo_suero.to_dict()    if ultimo_suero    else None,
-            "ultimos_vitales":  ultimos_vitales.to_dict() if ultimos_vitales else None,
-            "clientes_ws":      len(ws_manager.active),
+            "total_suero":     total_suero,
+            "total_vitales":   total_vitales,
+            "alertas_activas": alertas_activas,
+            "ultimo_suero":    ultimo_suero.to_dict()    if ultimo_suero    else None,
+            "ultimos_vitales": ultimos_vitales.to_dict() if ultimos_vitales else None,
+            "clientes_ws":     len(ws_manager.active),
         }
     finally:
         db.close()

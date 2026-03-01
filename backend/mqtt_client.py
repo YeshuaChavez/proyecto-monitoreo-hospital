@@ -1,8 +1,8 @@
 """
-MQTTManager:
-  - hospital/cama04/lecturas  → peso + bomba + estado_suero  (cada 1s)  → tabla suero
-  - hospital/cama04/vitales   → fc + spo2 + estado_vitales   (cada 10s) → tabla vitales
-  - hospital/cama04/comandos  → publica comandos al ESP32
+MQTTManager — Posta Médica / Consultorio General
+  - posta/consultorio/lecturas  → peso + bomba + estado_suero  (cada 1s)  → tabla suero
+  - posta/consultorio/vitales   → fc + spo2 + estado_vitales   (cada 10s) → tabla vitales
+  - posta/consultorio/comandos  → publica comandos al ESP32
 """
 
 import asyncio
@@ -24,9 +24,9 @@ MQTT_USER   = os.environ.get("MQTT_USER",   "esp32_cama04")
 MQTT_PASS   = os.environ.get("MQTT_PASS",   "Hospital123")
 MQTT_CLIENT = os.environ.get("MQTT_CLIENT", "FastAPI_Backend")
 
-TOPIC_LECTURAS = "hospital/cama04/lecturas"
-TOPIC_VITALES  = "hospital/cama04/vitales"
-TOPIC_COMANDOS = "hospital/cama04/comandos"
+TOPIC_LECTURAS = "posta/consultorio/lecturas"
+TOPIC_VITALES  = "posta/consultorio/vitales"
+TOPIC_COMANDOS = "posta/consultorio/comandos"
 
 # ── Umbrales alertas ──────────────────────────────────────────
 UMBRAL_FC_ALTA       = 100
@@ -45,7 +45,6 @@ class MQTTManager:
         self._cola_comandos   = asyncio.Queue()
         self._ultimo_telegram = datetime.min
 
-        # Estado compartido para broadcast completo al dashboard
         self._ultimo_suero: dict = {
             "peso":         999.0,
             "bomba":        False,
@@ -96,7 +95,6 @@ class MQTTManager:
         db = SessionLocal()
         try:
             alertas = []
-
             if peso <= UMBRAL_SUERO_CRITICO:
                 alertas.append(Alerta(
                     tipo    = "SUERO_CRITICO",
@@ -109,19 +107,16 @@ class MQTTManager:
                     mensaje = f"Nivel bajo de suero: {peso:.1f}g",
                     valor   = peso,
                 ))
-
             if bomba:
                 alertas.append(Alerta(
                     tipo    = "BOMBA_ON",
                     mensaje = "Bomba peristáltica activada — recargando suero",
                     valor   = None,
                 ))
-
             for a in alertas:
                 db.add(a)
             if alertas:
                 db.commit()
-
             return [a.to_dict() for a in alertas]
         finally:
             db.close()
@@ -131,7 +126,6 @@ class MQTTManager:
         db = SessionLocal()
         try:
             alertas = []
-
             if fc and fc > UMBRAL_FC_ALTA:
                 alertas.append(Alerta(
                     tipo    = "FC_ALTA",
@@ -144,19 +138,16 @@ class MQTTManager:
                     mensaje = f"Bradicardia: {fc} bpm (normal: 60-100)",
                     valor   = fc,
                 ))
-
             if spo2 and 0 < spo2 < UMBRAL_SPO2:
                 alertas.append(Alerta(
                     tipo    = "SPO2_BAJA",
                     mensaje = f"Saturación O₂ baja: {spo2}% (normal: ≥95%)",
                     valor   = spo2,
                 ))
-
             for a in alertas:
                 db.add(a)
             if alertas:
                 db.commit()
-
             return [a.to_dict() for a in alertas]
         finally:
             db.close()
@@ -170,7 +161,6 @@ class MQTTManager:
             restante = int(INTERVALO_TELEGRAM - (ahora - self._ultimo_telegram).total_seconds())
             print(f"📱 Telegram anti-spam ({restante}s restantes)")
             return
-
         mensaje, tipos = construir_mensaje(payload_completo, alertas)
         if mensaje:
             await enviar_alerta(mensaje, tipos)
@@ -190,7 +180,6 @@ class MQTTManager:
         }
 
         registro = self._guardar_suero(peso, bomba, estado_suero)
-
         payload_completo = {**self._ultimo_suero, **self._ultimos_vitales}
 
         await ws_manager.broadcast({
@@ -217,7 +206,6 @@ class MQTTManager:
         }
 
         registro = self._guardar_vitales(fc, spo2, estado_vitales)
-
         payload_completo = {**self._ultimo_suero, **self._ultimos_vitales}
 
         await ws_manager.broadcast({
@@ -253,8 +241,8 @@ class MQTTManager:
                 ) as client:
                     self._client = client
                     print("✅ MQTT conectado")
-                    await client.subscribe("hospital/cama04/#")
-                    print("📡 Suscrito: hospital/cama04/#")
+                    await client.subscribe("posta/consultorio/#")
+                    print("📡 Suscrito: posta/consultorio/#")
 
                     await asyncio.gather(
                         self._recibir(client, ws_manager),
