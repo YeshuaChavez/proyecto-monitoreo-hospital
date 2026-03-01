@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from database import SessionLocal, init_db
-from models import Suero, Vitales, Alerta, Config
+from models import Suero, Vitales, Alerta, Config, Usuario
 from mqtt_client import MQTTManager
 from telegram_bot import polling
 
@@ -329,5 +329,27 @@ def get_stats():
             "ultimos_vitales": ultimos_vitales.to_dict() if ultimos_vitales else None,
             "clientes_ws":     len(ws_manager.active),
         }
+    finally:
+        db.close()
+
+# ═══════════════════════════════════════════════════════════════
+#  REST — USUARIOS (LOGIN)
+# ═══════════════════════════════════════════════════════════════
+class LoginRequest(BaseModel):
+    usuario:  str
+    password: str
+
+@app.post("/login")
+def login(body: LoginRequest):
+    db = SessionLocal()
+    try:
+        user = db.query(Usuario).filter(
+            Usuario.usuario == body.usuario,
+            Usuario.password == body.password,
+            Usuario.activo == True,
+        ).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+        return user.to_dict()
     finally:
         db.close()

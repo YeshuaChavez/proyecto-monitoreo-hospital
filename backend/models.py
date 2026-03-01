@@ -90,3 +90,21 @@ class Config(Base):
             "peso_critico": self.peso_critico,
             "updated_at":   self.updated_at.isoformat() if self.updated_at else None,
         }
+
+class Usuario(Base):
+    __tablename__ = "usuarios"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    usuario    = Column(String(50), unique=True, nullable=False)
+    password   = Column(String(100), nullable=False)
+    nombre     = Column(String(100), nullable=False)
+    rol        = Column(String(50), nullable=False)
+    activo     = Column(Boolean, default=True)
+
+    def to_dict(self):
+        return {
+            "id":      self.id,
+            "usuario": self.usuario,
+            "nombre":  self.nombre,
+            "rol":     self.rol,
+        }
