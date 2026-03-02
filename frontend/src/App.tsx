@@ -54,12 +54,14 @@ function App() {
         conectado={conectado}
         esAdmin={esAdmin}
         usuarioActual={usuarioActual}
-        onLogout={() => {
+        onLogout={async () => {
+          try {
+            await fetch(`${BASE}/logout`, { method: "POST" });
+          } catch {}
           setUsuarioActual(null);
-          setPacienteActual(null);  // ← agrega esto
+          setPacienteActual(null);
           setTab("paciente");
-          // ← elimina el fetch /logout
-        }}      
+        }}     
       />
 
       <main style={{ position: "relative", zIndex: 1, padding: "28px 32px", maxWidth: 1400, margin: "0 auto" }}>
