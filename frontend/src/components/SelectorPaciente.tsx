@@ -34,48 +34,19 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual, usuarioActua
   }, []);
 
   useEffect(() => {
-  // Si no hay usuario, no intentamos cargar nada aún
-  if (!usuarioActual) return;
+    // Admin ve todos, doctor/enfermero solo sus pacientes
+    const url = esAdmin || !usuarioActual
+      ? `${BASE}/pacientes`
+      : `${BASE}/pacientes?doctor_id=${usuarioActual.id}`;
 
-  // 1. Construir la URL con limpieza de datos
-  // Usamos Number() para asegurar que el ID sea un número válido
-  const doctorId = Number(usuarioActual.id);
-  
-  const url = esAdmin 
-    ? `${BASE}/pacientes` 
-    : `${BASE}/pacientes?doctor_id=${doctorId}`;
-
-  console.log("Filtrando para médico ID:", doctorId, "URL:", url);
-
-  fetch(url)
+    fetch(url)
       .then(r => r.json())
-      .then((data: PacienteDB[]) => {
-        // 2. FILTRO DE SEGURIDAD MANUAL (Frontend)
-        // Si no es admin, filtramos el array nosotros mismos por si el backend
-        // devolvió de más por error.
-        if (!esAdmin) {
-          const soloMisPacientes = data.filter(p => 
-            Number(p.doctor_id) === doctorId
-          );
-          setPacientes(soloMisPacientes);
-        } else {
-          setPacientes(data);
-        }
-      })
-      .catch(err => console.error("Error en fetch pacientes:", err));
-  }, [usuarioActual, esAdmin]); // Añadimos esAdmin como dependencia
-
-  useEffect(() => {
-    fetch(`${BASE}/paciente-activo`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.paciente) {
-          setSeleccionado(data.paciente.id);
-          onPacienteSeleccionado(data.paciente);
-        }
-      })
+      .then(setPacientes)
       .catch(() => {});
-  }, []);
+  }, [usuarioActual]);
+
+  // NO cargamos paciente-activo global al montar
+  // Cada sesión empieza sin paciente seleccionado
 
   const handleSelect = (p: PacienteDB) => {
     setAbierto(false);
@@ -186,7 +157,7 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual, usuarioActua
             }}
           >
             <RefreshCw size={13} />
-            Seleccionar paciente
+            Cambiar paciente
             <ChevronDown size={13} style={{ transform: abierto ? "rotate(180deg)" : "none", transition: "0.2s" }} />
           </button>
         </div>

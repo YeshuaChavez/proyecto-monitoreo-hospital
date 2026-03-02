@@ -11,6 +11,8 @@ import { UsuarioLogin } from "./tipos";
 import { useLecturas } from "./hooks/useLecturas";
 import "./index.css";
 
+const BASE = (import.meta as any).env?.VITE_API_URL || "https://proyecto-monitoreo-posta-medica-production.up.railway.app";
+
 function App() {
   const [usuarioActual, setUsuarioActual] = useState<UsuarioLogin | null>(null);
   const [tab, setTab] = useState("paciente");
@@ -23,7 +25,11 @@ function App() {
     setAlertas,
   } = useLecturas();
 
-  if (!usuarioActual) return <Login onLogin={setUsuarioActual} />;
+  if (!usuarioActual) return <Login onLogin={(u) => {
+    // Limpiar paciente activo del servidor al iniciar sesión nueva
+    fetch(`${BASE}/logout`, { method: "POST" }).catch(() => {});
+    setUsuarioActual(u);
+  }} />;
 
   const esAdmin = usuarioActual.rol === "Administrador" || usuarioActual.usuario === "admin";
 
@@ -47,13 +53,13 @@ function App() {
         conectado={conectado}
         esAdmin={esAdmin}
         usuarioActual={usuarioActual}
-        onLogout={() => { setUsuarioActual(null); setTab("paciente"); }}
+        onLogout={() => { fetch(`${BASE}/logout`, { method: "POST" }).catch(() => {}); setUsuarioActual(null); setTab("paciente"); }}
       />
 
       <main style={{ position: "relative", zIndex: 1, padding: "28px 32px", maxWidth: 1400, margin: "0 auto" }}>
         {tab === "overview"  && <Monitor       live={live} historialSuero={historialSuero} historialVitales={historialVitales} />}
         {tab === "analytics" && <Analytics     live={live} historialVitales={historialVitales} historialSuero={historialSuero} />}
-        {tab === "paciente" && (<Paciente      live={live} alertas={alertas} usuarioActual={usuarioActual} />)}
+        {tab === "paciente"  && <Paciente      live={live} alertas={alertas} usuarioActual={usuarioActual} onPacienteSeleccionado={() => setTab("paciente")} />}
         {tab === "alertas"   && <Alertas       alertas={alertas} limpiarAlertas={() => setAlertas([])} />}
         {tab === "config"    && <Config        usuarioActual={usuarioActual} />}
         {tab === "admin" && esAdmin && <Administracion usuarioActual={usuarioActual} />}
