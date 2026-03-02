@@ -347,13 +347,11 @@ class EmailRequest(BaseModel):
 async def enviar_email_endpoint(body: EmailRequest):
     from email_service import enviar_email_familiar
     
-    # Obtener paciente activo de la BD
     db = SessionLocal()
     try:
-        cfg = db.query(Config).order_by(Config.id.desc()).first()
         paciente = None
-        if cfg and cfg.paciente_activo_id:
-            p = db.query(Paciente).filter(Paciente.id == cfg.paciente_activo_id).first()
+        if _paciente_activo_id:  # ← usa la variable global, no cfg
+            p = db.query(Paciente).filter(Paciente.id == _paciente_activo_id).first()
             if p:
                 paciente = p.to_dict()
     finally:
@@ -363,7 +361,7 @@ async def enviar_email_endpoint(body: EmailRequest):
         payload      = body.payload,
         alertas      = body.alertas,
         destinatario = body.destinatario,
-        paciente     = paciente,          # ← esto faltaba
+        paciente     = paciente,
     )
     return {"ok": True, "destinatario": body.destinatario}
 
