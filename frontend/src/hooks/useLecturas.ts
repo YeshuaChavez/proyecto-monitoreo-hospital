@@ -51,9 +51,21 @@ export function useLecturas(onPacienteActivo?: () => void) {
   }, []);
 
   useEffect(() => {
-    const intervalo = setInterval(() => { cargarHistorial(); }, 60_000);
+    const intervalo = setInterval(async () => {
+      try {
+        const [suero, alts] = await Promise.all([
+          getSueroPorMinuto(60),
+          getAlertas(50),
+        ]);
+        if (suero?.length) {
+          setHistorialSuero(suero);
+          setLive(l => ({ ...l, ...suero[suero.length - 1] }));
+        }
+        if (alts?.length) setAlertas(alts);
+      } catch (e) { console.warn("Error recargando:", e); }
+    }, 60_000);
     return () => clearInterval(intervalo);
-  }, [cargarHistorial]);
+  }, []);
 
   useEffect(() => {
     if (SIMULAR) return;
@@ -107,6 +119,21 @@ export function useLecturas(onPacienteActivo?: () => void) {
                 estado_vitales: vitales.estado_vitales,
               };
               setLive(l => ({ ...l, fc: vitales.fc, spo2: vitales.spo2, estado_vitales: vitales.estado_vitales }));
+
+              // ← NUEVO
+              setHistorialVitales(prev => {
+                const now = new Date();
+                const punto: DatosVitales = {
+                  id:             vitales.id ?? Date.now(),
+                  timestamp:      vitales.timestamp ?? now.toISOString(),
+                  time:           vitales.time ?? now.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+                  paciente_id:    vitales.paciente_id,
+                  fc:             vitales.fc,
+                  spo2:           vitales.spo2,
+                  estado_vitales: vitales.estado_vitales,
+                };
+                return [...prev, punto].slice(-60); // 60 puntos × 10s = últimos 10 min
+              });
             }
           }
 

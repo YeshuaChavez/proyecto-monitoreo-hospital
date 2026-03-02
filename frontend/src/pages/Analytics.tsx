@@ -203,8 +203,8 @@ const Analytics = ({ live, historialVitales = [], historialSuero = [], config = 
           </h2>
           <p style={{ fontSize: 12, color: "#4b5563", margin: "4px 0 0", fontFamily: "'JetBrains Mono', monospace" }}>
             {datosVitales.length > 0
-              ? `Estadísticas de ${datosVitales.length} promedios válidos`
-              : "Sin promedios aún — coloca el dedo en el sensor MAX30102"}
+              ? `Estadísticas de ${datosVitales.length} lecturas válidas`
+              : "Sin lecturas aún — coloca el dedo en el sensor MAX30102"}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>

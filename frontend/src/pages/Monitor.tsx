@@ -217,7 +217,7 @@ const Monitor = ({ live, historialSuero = [], historialVitales = [] }: Props) =>
             <Heart size={14} /> Frecuencia Cardíaca
           </div>
           <div style={{ fontSize: 10, color: "#4b5563", fontFamily: "'JetBrains Mono', monospace", marginBottom: 16 }}>
-            {datosFC.length} promedios registrados
+            {datosFC.length} lecturas · últimos 10 min
           </div>
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={datosFC} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
@@ -247,7 +247,7 @@ const Monitor = ({ live, historialSuero = [], historialVitales = [] }: Props) =>
             <Wind size={14} /> Saturación de Oxígeno
           </div>
           <div style={{ fontSize: 10, color: "#4b5563", fontFamily: "'JetBrains Mono', monospace", marginBottom: 16 }}>
-            {datosSpo2.length} promedios registrados
+            {datosSpo2.length} lecturas · últimos 10 min
           </div>
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={datosSpo2} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
