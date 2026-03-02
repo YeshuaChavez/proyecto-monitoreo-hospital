@@ -214,15 +214,16 @@ def get_suero_rango(desde: str, hasta: str):
 from sqlalchemy import Integer, func
 
 @app.get("/suero/por-minuto")
-def get_suero_por_minuto(limit: int = 60, db: Session = Depends(get_db)):
+def get_suero_por_minuto(limit: int = 60, paciente_id: int | None = None, db: Session = Depends(get_db)):
+    pid = paciente_id or _paciente_activo_id  # ← usa el del frontend si viene, si no el global
     q = db.query(
         func.date_format(Suero.timestamp, "%Y-%m-%d %H:%i").label("minuto"),
         func.avg(Suero.peso).label("peso"),
         func.max(Suero.bomba.cast(Integer)).label("bomba"),
         func.max(Suero.estado_suero).label("estado_suero"),
     )
-    if _paciente_activo_id:
-        q = q.filter(Suero.paciente_id == _paciente_activo_id)
+    if pid:
+        q = q.filter(Suero.paciente_id == pid)
     rows = q.group_by("minuto").order_by("minuto").limit(limit).all()
     return [
         {
@@ -235,17 +236,17 @@ def get_suero_por_minuto(limit: int = 60, db: Session = Depends(get_db)):
         for row in rows
     ]
 
-
 @app.get("/vitales/por-minuto")
-def get_vitales_por_minuto(limit: int = 60, db: Session = Depends(get_db)):
+def get_vitales_por_minuto(limit: int = 60, paciente_id: int | None = None, db: Session = Depends(get_db)):
+    pid = paciente_id or _paciente_activo_id
     q = db.query(
         func.date_format(Vitales.timestamp, "%Y-%m-%d %H:%i").label("minuto"),
         func.avg(Vitales.fc).label("fc"),
         func.avg(Vitales.spo2).label("spo2"),
         func.max(Vitales.estado_vitales).label("estado_vitales"),
     ).filter(Vitales.fc > 0, Vitales.spo2 > 0)
-    if _paciente_activo_id:
-        q = q.filter(Vitales.paciente_id == _paciente_activo_id)
+    if pid:
+        q = q.filter(Vitales.paciente_id == pid)
     rows = q.group_by("minuto").order_by("minuto").limit(limit).all()
     return [
         {
@@ -299,14 +300,15 @@ def get_vitales_rango(desde: str, hasta: str):
 #  REST — ALERTAS
 # ═══════════════════════════════════════════════════════════════
 @app.get("/alertas")
-def get_alertas(limit: int = 20, solo_activas: bool = False):
+def get_alertas(limit: int = 20, solo_activas: bool = False, paciente_id: int | None = None):
     db = SessionLocal()
+    pid = paciente_id or _paciente_activo_id
     try:
         q = db.query(Alerta).order_by(Alerta.id.desc())
         if solo_activas:
             q = q.filter(Alerta.activa == True)
-        if _paciente_activo_id:
-            q = q.filter(Alerta.paciente_id == _paciente_activo_id)
+        if pid:
+            q = q.filter(Alerta.paciente_id == pid)
         return [r.to_dict() for r in q.limit(limit).all()]
     finally:
         db.close()
