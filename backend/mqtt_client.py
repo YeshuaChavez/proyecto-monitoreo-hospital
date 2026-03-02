@@ -37,6 +37,28 @@ INTERVALO_TELEGRAM = 15
 ESTADOS_INACTIVOS  = {"INICIANDO", "ESPERANDO"}
 
 
+# ── FIX P3: Calcular estado_vitales en backend ──────────────
+def calcular_estado_vitales(fc: int, spo2: int) -> str:
+    """Calcula estado clínico combinado a partir de FC y SpO2."""
+    problemas = []
+
+    if fc > 0:
+        if fc > UMBRAL_FC_ALTA:
+            problemas.append("TAQUICARDIA")
+        elif fc < UMBRAL_FC_BAJA:
+            problemas.append("BRADICARDIA")
+
+    if spo2 > 0:
+        if spo2 < 90:
+            problemas.append("HIPOXIA GRAVE")
+        elif spo2 < UMBRAL_SPO2:
+            problemas.append("HIPOXIA")
+
+    if not problemas:
+        return "NORMAL"
+    return " + ".join(problemas)  # ej: "TAQUICARDIA + HIPOXIA"
+
+
 class MQTTManager:
     def __init__(self):
         self._client          = None
@@ -67,19 +89,24 @@ class MQTTManager:
     def _guardar_suero(self, peso: float, bomba: bool, estado_suero: str) -> Suero:
         db = SessionLocal()
         try:
+            # FIX P4: capturar origen ANTES de resetear
+            origen = self.ultimo_origen if bomba else None
+
             registro = Suero(
                 timestamp      = datetime.utcnow() - timedelta(hours=5),
-                paciente_id    = self._get_paciente_id(),   # ← FIX
+                paciente_id    = self._get_paciente_id(),
                 peso           = peso,
                 bomba          = bomba,
                 estado_suero   = estado_suero,
-                origen_comando = self.ultimo_origen if bomba else None,
+                origen_comando = origen,
             )
             db.add(registro)
             db.commit()
             db.refresh(registro)
-            if bomba:
-                self.ultimo_origen = "automatico"
+
+            # FIX P4: solo resetear si el origen era un comando externo ya guardado
+            # NO resetear a "automatico" aquí — se resetea solo cuando llega bomba=False
+            # para que el origen persista mientras la bomba esté activa
             return registro
         finally:
             db.close()
@@ -90,10 +117,10 @@ class MQTTManager:
         try:
             registro = Vitales(
                 timestamp      = datetime.utcnow() - timedelta(hours=5),
-                paciente_id    = self._get_paciente_id(),   # ← FIX
+                paciente_id    = self._get_paciente_id(),
                 fc             = fc,
                 spo2           = spo2,
-                estado_vitales = estado_vitales,
+                estado_vitales = estado_vitales,  # ya calculado correctamente
             )
             db.add(registro)
             db.commit()
@@ -120,7 +147,7 @@ class MQTTManager:
         if self._alerta_suero_activa:
             return []
 
-        paciente_id = self._get_paciente_id()   # ← FIX
+        paciente_id = self._get_paciente_id()
 
         db = SessionLocal()
         try:
@@ -128,23 +155,23 @@ class MQTTManager:
             if peso <= umbral_critico:
                 alertas.append(Alerta(
                     tipo        = "SUERO_CRITICO",
-                    mensaje     = f"Nivel crítico de suero: {peso:.1f}g — bomba activada (umbral: {umbral_critico}g)",
+                    mensaje     = f"Nivel crítico de suero: {peso:.1f} ml — bomba activada (umbral: {umbral_critico} ml)",
                     valor       = peso,
-                    paciente_id = paciente_id,   # ← FIX
+                    paciente_id = paciente_id,
                 ))
             elif peso <= umbral_alerta:
                 alertas.append(Alerta(
                     tipo        = "SUERO_BAJO",
-                    mensaje     = f"Nivel bajo de suero: {peso:.1f}g (umbral alerta: {umbral_alerta}g)",
+                    mensaje     = f"Nivel bajo de suero: {peso:.1f} ml (umbral alerta: {umbral_alerta} ml)",
                     valor       = peso,
-                    paciente_id = paciente_id,   # ← FIX
+                    paciente_id = paciente_id,
                 ))
             if bomba:
                 alertas.append(Alerta(
                     tipo        = "BOMBA_ON",
                     mensaje     = "Bomba peristáltica activada — recargando suero",
                     valor       = None,
-                    paciente_id = paciente_id,   # ← FIX
+                    paciente_id = paciente_id,
                 ))
             for a in alertas:
                 db.add(a)
@@ -162,7 +189,7 @@ class MQTTManager:
         if fc == 0 and spo2 == 0:
             return []
 
-        paciente_id = self._get_paciente_id()   # ← FIX
+        paciente_id = self._get_paciente_id()
 
         db = SessionLocal()
         try:
@@ -172,21 +199,21 @@ class MQTTManager:
                     tipo        = "FC_ALTA",
                     mensaje     = f"Taquicardia: {fc} bpm (normal: 60-100)",
                     valor       = fc,
-                    paciente_id = paciente_id,   # ← FIX
+                    paciente_id = paciente_id,
                 ))
             elif fc and 0 < fc < UMBRAL_FC_BAJA:
                 alertas.append(Alerta(
                     tipo        = "FC_BAJA",
                     mensaje     = f"Bradicardia: {fc} bpm (normal: 60-100)",
                     valor       = fc,
-                    paciente_id = paciente_id,   # ← FIX
+                    paciente_id = paciente_id,
                 ))
             if spo2 and 0 < spo2 < UMBRAL_SPO2:
                 alertas.append(Alerta(
                     tipo        = "SPO2_BAJA",
-                    mensaje     = f"Saturación O₂ baja: {spo2}% (normal: ≥95%)",
+                    mensaje     = f"Saturación O2 baja: {spo2}% (normal: ≥95%)",
                     valor       = spo2,
-                    paciente_id = paciente_id,   # ← FIX
+                    paciente_id = paciente_id,
                 ))
             for a in alertas:
                 db.add(a)
@@ -196,10 +223,10 @@ class MQTTManager:
         finally:
             db.close()
 
-    # ── Setear paciente activo (llamado desde main.py) ────────
+    # ── Setear paciente activo ────────────────────────────────
     def set_paciente_activo(self, paciente: dict | None):
         self._paciente_activo = paciente
-        self._alerta_suero_activa = False  # reset flag al cambiar paciente
+        self._alerta_suero_activa = False
         print(f"👤 Paciente activo: {paciente.get('nombre') if paciente else 'None'} (id={self._get_paciente_id()})")
 
     # ── Publicar configuración al ESP32 ──────────────────────
@@ -232,6 +259,12 @@ class MQTTManager:
         bomba        = payload.get("bomba",  False)
         estado_suero = payload.get("estado", "ESPERANDO")
 
+        # FIX P4: si bomba acaba de apagarse, resetear origen
+        bomba_anterior = self._ultimo_suero.get("bomba", False)
+        if bomba_anterior and not bomba:
+            self.ultimo_origen = "automatico"
+            print("🔄 Bomba apagada — origen reseteado a 'automatico'")
+
         self._ultimo_suero = {
             "peso":         peso,
             "bomba":        bomba,
@@ -254,9 +287,13 @@ class MQTTManager:
 
     # ── Handler: vitales → tabla vitales ─────────────────────
     async def _procesar_vitales(self, payload: dict, ws_manager):
-        fc             = payload.get("fc",     0)
-        spo2           = payload.get("spo2",   0)
-        estado_vitales = payload.get("estado", "NORMAL")
+        fc   = payload.get("fc",   0)
+        spo2 = payload.get("spo2", 0)
+
+        # FIX P3: calcular estado en backend, no confiar en el ESP32
+        estado_vitales = calcular_estado_vitales(fc, spo2)
+
+        print(f"💓 Vitales → FC:{fc} SpO2:{spo2} → {estado_vitales}")
 
         self._ultimos_vitales = {
             "fc":             fc,

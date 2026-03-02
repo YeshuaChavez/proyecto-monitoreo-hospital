@@ -12,11 +12,10 @@ import aiohttp
 
 TELEGRAM_TOKEN   = os.environ.get("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
-BACKEND_URL  = os.environ.get("BACKEND_URL", "https://proyecto-monitoreo-posta-medica-production.up.railway.app")
+BACKEND_URL   = os.environ.get("BACKEND_URL", "https://proyecto-monitoreo-posta-medica-production.up.railway.app")
 DASHBOARD_URL = "https://proyecto-monitoreo-posta-medica.vercel.app"
-TELEGRAM_URL     = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+TELEGRAM_URL  = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
-# Solo estos tipos muestran botones de bomba
 TIPOS_CON_BOTONES = {"SUERO_CRITICO", "SUERO_BAJO", "BOMBA_ON"}
 
 
@@ -35,7 +34,6 @@ async def enviar_alerta(mensaje: str, tipos_alerta: set = None):
     }
 
     if es_suero:
-        # Alertas de suero: botones de control + link al dashboard
         payload_msg["reply_markup"] = {
             "inline_keyboard": [
                 [
@@ -48,7 +46,6 @@ async def enviar_alerta(mensaje: str, tipos_alerta: set = None):
             ]
         }
     else:
-        # Alertas de signos vitales: solo link al dashboard
         payload_msg["reply_markup"] = {
             "inline_keyboard": [[
                 {"text": "📊 Ver Dashboard", "url": DASHBOARD_URL},
@@ -63,7 +60,7 @@ async def enviar_alerta(mensaje: str, tipos_alerta: set = None):
         print(f"❌ Error Telegram enviar: {e}")
 
 
-# ── Responder al callback (cuando presionan un botón) ─────────
+# ── Responder al callback ──────────────────────────────────────
 async def responder_callback(callback_query_id: str, texto: str):
     try:
         async with aiohttp.ClientSession() as session:
@@ -76,13 +73,13 @@ async def responder_callback(callback_query_id: str, texto: str):
         print(f"❌ Error Telegram callback: {e}")
 
 
-# ── Enviar comando al backend → MQTT → ESP32 ──────────────────
+# ── Enviar comando al backend ──────────────────────────────────
 async def ejecutar_comando(cmd: str):
     try:
         async with aiohttp.ClientSession() as session:
             res = await session.post(
                 f"{BACKEND_URL}/comandos",
-                json={"cmd": cmd, "origen": "telegram"},  # ← solo esto cambia
+                json={"cmd": cmd, "origen": "telegram"},
                 headers={"Content-Type": "application/json"},
             )
             data = await res.json()
@@ -93,7 +90,7 @@ async def ejecutar_comando(cmd: str):
         return False
 
 
-# ── Polling — escucha botones presionados ─────────────────────
+# ── Polling ────────────────────────────────────────────────────
 async def polling():
     if not TELEGRAM_TOKEN:
         print("⚠️ Telegram polling desactivado — sin token")
@@ -143,12 +140,8 @@ async def polling():
             await asyncio.sleep(5)
 
 
-# ── Construir mensaje según estado del paciente ───────────────
+# ── Construir mensaje ──────────────────────────────────────────
 def construir_mensaje(payload: dict, alertas: list, paciente: dict | None = None) -> tuple[str | None, set]:
-    """
-    Genera un mensaje clínico claro según el estado del paciente.
-    Retorna (mensaje, tipos_presentes).
-    """
     if not alertas:
         return None, set()
 
@@ -159,16 +152,12 @@ def construir_mensaje(payload: dict, alertas: list, paciente: dict | None = None
 
     tipos_presentes = {a.get("tipo", "") for a in alertas}
 
-    # ── Determinar severidad global ───────────────────────────
     es_critico = any(t in tipos_presentes for t in {"SUERO_CRITICO", "SPO2_BAJA"})
 
     nombre_paciente = f"{paciente['nombre']} {paciente['apellido']}" if paciente else "Paciente"
-    codigo_paciente = paciente.get('codigo') or f"PCT-{paciente.get('id','?')}" if paciente else "—"
+    codigo_paciente = paciente.get("codigo") or f"PCT-{paciente.get('id','?')}" if paciente else "—"
 
-    if es_critico:
-        encabezado = "🚨 <b>ALERTA CRÍTICA</b>"
-    else:
-        encabezado = "⚠️ <b>ALERTA</b>"
+    encabezado = "🚨 <b>ALERTA CRÍTICA</b>" if es_critico else "⚠️ <b>ALERTA</b>"
 
     lineas = [
         encabezado,
@@ -176,55 +165,60 @@ def construir_mensaje(payload: dict, alertas: list, paciente: dict | None = None
         "",
     ]
 
-    # ── Mensaje por tipo de alerta ────────────────────────────
-
-    # SpO2 baja
     if "SPO2_BAJA" in tipos_presentes:
         nivel = "GRAVE" if spo2 < 90 else "BAJO"
-        lineas.append(f"🫁 <b>Saturación O₂ {nivel}</b>")
-        lineas.append(f"   El paciente presenta SpO2 de <b>{spo2}%</b>")
-        lineas.append(f"   Valor normal ≥95% — Se recomienda intervención inmediata.")
-        lineas.append("")
+        lineas += [
+            f"🫁 <b>Saturación O₂ {nivel}</b>",
+            f"   SpO2 actual: <b>{spo2}%</b> (normal ≥95%)",
+            f"   Se recomienda intervención inmediata.",
+            "",
+        ]
 
-    # FC alta → taquicardia
     if "FC_ALTA" in tipos_presentes:
-        lineas.append("❤️ <b>Taquicardia detectada</b>")
-        lineas.append(f"   El paciente registra <b>{fc} lpm</b>")
-        lineas.append(f"   Rango normal: 60–100 lpm — Monitorear evolución.")
-        lineas.append("")
+        lineas += [
+            "❤️ <b>Taquicardia detectada</b>",
+            f"   FC actual: <b>{fc} lpm</b> (normal 60–100)",
+            f"   Monitorear evolución.",
+            "",
+        ]
 
-    # FC baja → bradicardia
     if "FC_BAJA" in tipos_presentes:
-        lineas.append("❤️ <b>Bradicardia detectada</b>")
-        lineas.append(f"   El paciente registra <b>{fc} lpm</b>")
-        lineas.append(f"   Rango normal: 60–100 lpm — Evaluar estado de consciencia.")
-        lineas.append("")
+        lineas += [
+            "❤️ <b>Bradicardia detectada</b>",
+            f"   FC actual: <b>{fc} lpm</b> (normal 60–100)",
+            f"   Evaluar estado de consciencia.",
+            "",
+        ]
 
-    # Suero crítico
     if "SUERO_CRITICO" in tipos_presentes:
-        lineas.append("💉 <b>Suero IV en nivel crítico</b>")
-        lineas.append(f"   Nivel actual: <b>{peso:.0f}g</b> — Bomba peristáltica activada.")
-        lineas.append(f"   Verificar bolsa de respaldo y conexión del catéter.")
-        lineas.append("")
-
-    # Suero bajo (sin llegar a crítico)
+        lineas += [
+            "💉 <b>Suero IV en nivel CRÍTICO</b>",
+            f"   Nivel actual: <b>{peso:.0f} ml</b> — Bomba activada automáticamente.",
+            f"   Verificar bolsa de respaldo y conexión del catéter.",
+            "",
+        ]
     elif "SUERO_BAJO" in tipos_presentes:
-        lineas.append("💧 <b>Nivel de suero bajo</b>")
-        lineas.append(f"   Nivel actual: <b>{peso:.0f}g</b> — Umbral de alerta: 150g.")
-        lineas.append(f"   Preparar bolsa de reemplazo.")
-        lineas.append("")
+        lineas += [
+            "💧 <b>Nivel de suero bajo</b>",
+            f"   Nivel actual: <b>{peso:.0f} ml</b>",
+            f"   Preparar bolsa de reemplazo.",
+            "",
+        ]
 
-    # Bomba activada automáticamente
     if "BOMBA_ON" in tipos_presentes:
-        lineas.append("🔄 <b>Bomba intravenosa activa</b>")
-        lineas.append(f"   Recargando suero desde bolsa de respaldo.")
-        lineas.append("")
+        lineas += [
+            "🔄 <b>Bomba peristáltica activa</b>",
+            f"   Recargando suero desde bolsa de respaldo.",
+            "",
+        ]
 
-    # ── Estado actual del paciente ────────────────────────────
-    lineas.append("📋 <b>Estado del paciente:</b>")
-    lineas.append(f"   FC:    <b>{fc if fc > 0 else '--'} lpm</b>")
-    lineas.append(f"   SpO2:  <b>{spo2 if spo2 > 0 else '--'}%</b>")
-    lineas.append(f"   Suero: <b>{peso:.0f}g</b>")
-    lineas.append(f"   Bomba: {'🟡 Activa' if bomba else '🟢 Standby'}")
+    # Estado resumen al final
+    lineas += [
+        "📋 <b>Estado del paciente:</b>",
+        f"   FC:    <b>{fc if fc > 0 else '--'} lpm</b>",
+        f"   SpO2:  <b>{spo2 if spo2 > 0 else '--'}%</b>",
+        f"   Suero: <b>{peso:.0f} ml</b>",
+        f"   Bomba: {'🟡 Activa' if bomba else '🟢 Standby'}",
+    ]
 
     return "\n".join(lineas), tipos_presentes

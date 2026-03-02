@@ -463,6 +463,13 @@ def login(body: LoginRequest):
     finally:
         db.close()
 
+@app.post("/logout")
+async def logout():
+    global _paciente_activo_id
+    _paciente_activo_id = None
+    mqtt_manager.set_paciente_activo(None)
+    return {"ok": True}
+
 
 # ═══════════════════════════════════════════════════════════════
 #  REST — PACIENTES (CRUD)
@@ -642,3 +649,4 @@ def get_usuarios_medicos():
                 .order_by(Usuario.nombre).all()]
     finally:
         db.close()
+
