@@ -43,7 +43,6 @@ const TopBar = ({ color }: { color: string }) => (
 const Paciente = ({ live, alertas = [], onPacienteSeleccionado, usuarioActual, pacienteActual }: Props) => {
   if (!live) return null;
 
-  const [pacienteLocal, setPacienteLocal] = useState<PacienteDB | null>(pacienteActual ?? null);
   const [enviando,  setEnviando]  = useState(false);
   const [bombaLocal, setBombaLocal] = useState<boolean | null>(null); // null = usa live.bomba
   const [error,     setError]     = useState<string | null>(null);

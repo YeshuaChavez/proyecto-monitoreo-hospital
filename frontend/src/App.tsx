@@ -19,28 +19,20 @@ function App() {
   const [config, setConfig] = useState({ peso_alerta: 150, peso_critico: 100 });
   const [usuarioActual, setUsuarioActual] = useState<UsuarioLogin | null>(null);
   const [tab, setTab] = useState("paciente");
-  const {
-    live,
-    historialSuero,
-    historialVitales,
-    conectado,
-    alertas,
-    setAlertas,
-  } = useLecturas();
-
-  if (!usuarioActual) return <Login onLogin={setUsuarioActual} />;
-
-
-  const esAdmin = usuarioActual.rol === "Administrador" || usuarioActual.usuario === "admin";
-
   const cargarConfig = useCallback(async () => {
     try {
       const c = await getConfig();
       if (c?.peso_alerta) setConfig({ peso_alerta: c.peso_alerta, peso_critico: c.peso_critico });
     } catch {}
   }, []);
-
   useEffect(() => { cargarConfig(); }, [cargarConfig]);
+
+  const { live, historialSuero, historialVitales, conectado, alertas, setAlertas } = useLecturas(cargarConfig);
+
+  // ✅ return condicional AQUÍ, después de todos los hooks
+  if (!usuarioActual) return <Login onLogin={setUsuarioActual} />;
+
+  const esAdmin = usuarioActual.rol === "Administrador" || usuarioActual.usuario === "admin";
 
   return (
     <div style={{
