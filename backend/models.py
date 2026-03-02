@@ -139,6 +139,7 @@ class Config(Base):
     __tablename__ = "config"
 
     id           = Column(Integer, primary_key=True, autoincrement=True)
+    paciente_id  = Column(Integer, ForeignKey("pacientes.id"), nullable=True, index=True)  # ← nuevo
     peso_alerta  = Column(Float, default=150.0)
     peso_critico = Column(Float, default=100.0)
     updated_at   = Column(DateTime, default=datetime.utcnow)
@@ -146,6 +147,7 @@ class Config(Base):
     def to_dict(self):
         return {
             "id":           self.id,
+            "paciente_id":  self.paciente_id,
             "peso_alerta":  self.peso_alerta,
             "peso_critico": self.peso_critico,
             "updated_at":   self.updated_at.isoformat() if self.updated_at else None,

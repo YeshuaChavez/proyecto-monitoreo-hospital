@@ -379,7 +379,14 @@ class ConfigRequest(BaseModel):
 def get_configuracion():
     db = SessionLocal()
     try:
-        cfg = db.query(Config).order_by(Config.id.desc()).first()
+        q = db.query(Config).order_by(Config.id.desc())
+        if _paciente_activo_id:
+            # Busca config específica del paciente, si no existe usa la global
+            cfg = q.filter(Config.paciente_id == _paciente_activo_id).first()
+            if not cfg:
+                cfg = q.filter(Config.paciente_id == None).first()
+        else:
+            cfg = q.first()
         if cfg:
             return cfg.to_dict()
         return {"peso_alerta": 150.0, "peso_critico": 100.0}
@@ -389,19 +396,14 @@ def get_configuracion():
 @app.post("/config")
 async def guardar_configuracion(body: ConfigRequest):
     if body.peso_critico >= body.peso_alerta:
-        raise HTTPException(
-            status_code=400,
-            detail="El umbral crítico debe ser menor que el de alerta"
-        )
+        raise HTTPException(status_code=400, detail="El umbral crítico debe ser menor que el de alerta")
     if body.peso_critico < 10 or body.peso_alerta > 490:
-        raise HTTPException(
-            status_code=400,
-            detail="Umbrales fuera de rango (10–490g)"
-        )
+        raise HTTPException(status_code=400, detail="Umbrales fuera de rango (10–490g)")
 
     db = SessionLocal()
     try:
         cfg = Config(
+            paciente_id  = _paciente_activo_id,  # ← vincula al paciente activo
             peso_alerta  = body.peso_alerta,
             peso_critico = body.peso_critico,
             updated_at   = datetime.utcnow() - timedelta(hours=5),
@@ -415,7 +417,6 @@ async def guardar_configuracion(body: ConfigRequest):
 
     await mqtt_manager.publicar_config(body.peso_alerta, body.peso_critico)
     return {"ok": True, "config": result}
-
 
 # ═══════════════════════════════════════════════════════════════
 #  REST — STATS
