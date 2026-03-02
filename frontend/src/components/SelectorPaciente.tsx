@@ -34,6 +34,8 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual, usuarioActua
   }, []);
 
   useEffect(() => {
+
+    if (!usuarioActual) return;
     // Admin ve todos, doctor/enfermero solo sus pacientes
     const url = esAdmin || !usuarioActual
       ? `${BASE}/pacientes`
@@ -41,9 +43,17 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual, usuarioActua
 
     fetch(url)
       .then(r => r.json())
-      .then(setPacientes)
-      .catch(() => {});
-  }, [usuarioActual]);
+      .then(data => {
+        // Doble verificación: Si no es admin, filtramos también en el cliente por seguridad
+        if (!esAdmin) {
+          const filtrados = data.filter((p: PacienteDB) => p.doctor_id === usuarioActual.id);
+          setPacientes(filtrados);
+        } else {
+          setPacientes(data);
+        }
+      })
+      .catch(err => console.error("Error cargando pacientes:", err));
+  }, [usuarioActual, esAdmin]);
 
   useEffect(() => {
     fetch(`${BASE}/paciente-activo`)
@@ -166,7 +176,7 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual, usuarioActua
             }}
           >
             <RefreshCw size={13} />
-            Cambiar paciente
+            Seleccionar paciente
             <ChevronDown size={13} style={{ transform: abierto ? "rotate(180deg)" : "none", transition: "0.2s" }} />
           </button>
         </div>
