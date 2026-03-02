@@ -77,7 +77,12 @@ class MQTTManager:
         }
         self.ultimo_origen: str      = "automatico"
         self._paciente_activo: dict | None = None
-        self._alerta_suero_activa    = False
+
+        # ── FIX: reemplaza el bool por un nivel string ──────
+        # None → sin alerta activa
+        # "BAJO"    → ya se envió alerta SUERO_BAJO
+        # "CRITICO" → ya se envió alerta SUERO_CRITICO
+        self._nivel_alerta_enviado: str | None = None
 
     # ── Helper: obtener paciente_id activo ───────────────────
     def _get_paciente_id(self) -> int | None:
@@ -89,7 +94,6 @@ class MQTTManager:
     def _guardar_suero(self, peso: float, bomba: bool, estado_suero: str) -> Suero:
         db = SessionLocal()
         try:
-            # FIX P4: capturar origen ANTES de resetear
             origen = self.ultimo_origen if bomba else None
 
             registro = Suero(
@@ -103,10 +107,6 @@ class MQTTManager:
             db.add(registro)
             db.commit()
             db.refresh(registro)
-
-            # FIX P4: solo resetear si el origen era un comando externo ya guardado
-            # NO resetear a "automatico" aquí — se resetea solo cuando llega bomba=False
-            # para que el origen persista mientras la bomba esté activa
             return registro
         finally:
             db.close()
@@ -120,7 +120,7 @@ class MQTTManager:
                 paciente_id    = self._get_paciente_id(),
                 fc             = fc,
                 spo2           = spo2,
-                estado_vitales = estado_vitales,  # ya calculado correctamente
+                estado_vitales = estado_vitales,
             )
             db.add(registro)
             db.commit()
@@ -138,17 +138,29 @@ class MQTTManager:
         umbral_alerta  = cfg["peso_alerta"]
         umbral_critico = cfg["peso_critico"]
 
+        # Suero recuperado → resetear todo
         if peso > umbral_alerta:
-            if self._alerta_suero_activa:
-                print(f"✅ Suero recuperado ({peso:.1f}g) — alertas desactivadas")
-                self._alerta_suero_activa = False
+            if self._nivel_alerta_enviado:
+                print(f"✅ Suero recuperado ({peso:.1f}g) — alertas reseteadas")
+                self._nivel_alerta_enviado = None
             return []
 
-        if self._alerta_suero_activa:
+        # ── Lógica de escalado ───────────────────────────────
+        # Si ya enviamos CRITICO → no repetir
+        if self._nivel_alerta_enviado == "CRITICO":
             return []
 
+        # Si ya enviamos BAJO pero ahora llegó a CRITICO → escalar, resetear bandera
+        if self._nivel_alerta_enviado == "BAJO" and peso <= umbral_critico:
+            print(f"🚨 Escalando BAJO → CRITICO ({peso:.1f}g) — permitiendo nueva alerta")
+            self._nivel_alerta_enviado = None
+
+        # Si ya enviamos BAJO y sigue siendo BAJO (no crítico) → no repetir
+        if self._nivel_alerta_enviado == "BAJO":
+            return []
+
+        # ── Generar alertas ──────────────────────────────────
         paciente_id = self._get_paciente_id()
-
         db = SessionLocal()
         try:
             alertas = []
@@ -177,7 +189,12 @@ class MQTTManager:
                 db.add(a)
             if alertas:
                 db.commit()
-                self._alerta_suero_activa = True
+                # Guardar el nivel más grave de las alertas generadas
+                if any(a.tipo == "SUERO_CRITICO" for a in alertas):
+                    self._nivel_alerta_enviado = "CRITICO"
+                else:
+                    self._nivel_alerta_enviado = "BAJO"
+                print(f"🔔 Nivel alerta guardado: {self._nivel_alerta_enviado}")
             return [a.to_dict() for a in alertas]
         finally:
             db.close()
@@ -226,7 +243,7 @@ class MQTTManager:
     # ── Setear paciente activo ────────────────────────────────
     def set_paciente_activo(self, paciente: dict | None):
         self._paciente_activo = paciente
-        self._alerta_suero_activa = False
+        self._nivel_alerta_enviado = None  # FIX: era _alerta_suero_activa = False
         print(f"👤 Paciente activo: {paciente.get('nombre') if paciente else 'None'} (id={self._get_paciente_id()})")
 
     # ── Publicar configuración al ESP32 ──────────────────────
@@ -248,7 +265,6 @@ class MQTTManager:
             print(f"📱 Telegram anti-spam ({restante}s restantes)")
             return
 
-        # ← NUEVO: si fc o spo2 son 0, buscar último valor válido en BD
         payload_enriquecido = dict(payload_completo)
         if payload_enriquecido.get("fc", 0) == 0 or payload_enriquecido.get("spo2", 0) == 0:
             db = SessionLocal()
@@ -283,10 +299,6 @@ class MQTTManager:
         if bomba_anterior and not bomba:
             self.ultimo_origen = "automatico"
             print("🔄 Bomba apagada — origen reseteado a 'automatico'")
-            # ← resetear alerta si recarga completada
-            if peso >= "NORMAL":
-                self._alerta_suero_activa = False
-                print(f"✅ Recarga completa ({peso:.1f}ml) — alertas reseteadas")
 
         self._ultimo_suero = {
             "peso":         peso,
@@ -315,13 +327,11 @@ class MQTTManager:
                 await self.publicar_comando("bomba_on")
                 print(f"🚨 Bomba AUTO — {peso:.1f}ml <= crítico {cfg['peso_critico']}ml")
 
-                # Mandar telegram directo, saltando anti-spam solo para bomba auto
                 alerta_bomba = [{
                     "tipo":    "SUERO_CRITICO",
                     "mensaje": f"Nivel crítico: {peso:.1f}ml — bomba activada automáticamente",
                     "valor":   peso,
                 }]
-                # Forzar reset del timer para que este mensaje siempre salga
                 self._ultimo_telegram = datetime.min
                 await self._enviar_telegram_si_aplica(payload_completo, alerta_bomba)
 
@@ -330,7 +340,6 @@ class MQTTManager:
         fc   = payload.get("fc",   0)
         spo2 = payload.get("spo2", 0)
 
-        # FIX P3: calcular estado en backend, no confiar en el ESP32
         estado_vitales = calcular_estado_vitales(fc, spo2)
 
         print(f"💓 Vitales → FC:{fc} SpO2:{spo2} → {estado_vitales}")
