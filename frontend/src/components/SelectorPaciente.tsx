@@ -34,16 +34,36 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual, usuarioActua
   }, []);
 
   useEffect(() => {
-    // Admin ve todos, doctor/enfermero solo sus pacientes
-    const url = esAdmin || !usuarioActual
-      ? `${BASE}/pacientes`
-      : `${BASE}/pacientes?doctor_id=${usuarioActual.id}`;
+  // Si no hay usuario, no intentamos cargar nada aún
+  if (!usuarioActual) return;
 
-    fetch(url)
+  // 1. Construir la URL con limpieza de datos
+  // Usamos Number() para asegurar que el ID sea un número válido
+  const doctorId = Number(usuarioActual.id);
+  
+  const url = esAdmin 
+    ? `${BASE}/pacientes` 
+    : `${BASE}/pacientes?doctor_id=${doctorId}`;
+
+  console.log("Filtrando para médico ID:", doctorId, "URL:", url);
+
+  fetch(url)
       .then(r => r.json())
-      .then(setPacientes)
-      .catch(() => {});
-  }, [usuarioActual]);
+      .then((data: PacienteDB[]) => {
+        // 2. FILTRO DE SEGURIDAD MANUAL (Frontend)
+        // Si no es admin, filtramos el array nosotros mismos por si el backend
+        // devolvió de más por error.
+        if (!esAdmin) {
+          const soloMisPacientes = data.filter(p => 
+            Number(p.doctor_id) === doctorId
+          );
+          setPacientes(soloMisPacientes);
+        } else {
+          setPacientes(data);
+        }
+      })
+      .catch(err => console.error("Error en fetch pacientes:", err));
+  }, [usuarioActual, esAdmin]); // Añadimos esAdmin como dependencia
 
   useEffect(() => {
     fetch(`${BASE}/paciente-activo`)
