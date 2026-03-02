@@ -20,57 +20,57 @@ export function useLecturas(onPacienteActivo?: () => void) {
   });
   const onPacienteActivoRef = useRef(onPacienteActivo);
   const bloqueadoRef        = useRef(false);
-  const pacienteActivoIdRef = useRef<number | null>(null); // ← NUEVO
+  const pacienteActivoIdRef = useRef<number | null>(null);
 
   useEffect(() => { onPacienteActivoRef.current = onPacienteActivo; }, [onPacienteActivo]);
 
   const resetEstado = useCallback(() => {
-      pacienteActivoIdRef.current = null;  // ← NUEVO: limpiar id al resetear
-      setLive({ fc:0, spo2:0, peso:500, bomba:false, estado_suero:"NORMAL", estado_vitales:"MIDIENDO" });
-      setHistorialSuero([]);
-      setHistorialVitales([]);
-      setAlertas([]);
-      ultimosVitalesRef.current = { fc:0, spo2:0, estado_vitales:"MIDIENDO" };
+    pacienteActivoIdRef.current = null;
+    setLive({ fc:0, spo2:0, peso:500, bomba:false, estado_suero:"NORMAL", estado_vitales:"MIDIENDO" });
+    setHistorialSuero([]);
+    setHistorialVitales([]);
+    setAlertas([]);
+    ultimosVitalesRef.current = { fc:0, spo2:0, estado_vitales:"MIDIENDO" };
   }, []);
 
   const cargarHistorial = useCallback(async () => {
-      const pid = pacienteActivoIdRef.current ?? undefined;  // ← NUEVO
+    const pid = pacienteActivoIdRef.current ?? undefined;
+    try {
+      const [suero, vitales, alts] = await Promise.all([
+        getSueroPorMinuto(60, pid),
+        getVitalesPorMinuto(60, pid),
+        getAlertas(50, pid),
+      ]);
+      if (suero?.length) {
+        setHistorialSuero(suero);
+        setLive(l => ({ ...l, ...suero[suero.length - 1] }));
+      }
+      if (vitales?.length) {
+        setHistorialVitales(vitales);
+        const ultimo = vitales[vitales.length - 1];
+        ultimosVitalesRef.current = { fc: ultimo.fc, spo2: ultimo.spo2, estado_vitales: ultimo.estado_vitales };
+        setLive(l => ({ ...l, fc: ultimo.fc, spo2: ultimo.spo2, estado_vitales: ultimo.estado_vitales }));
+      }
+      if (alts?.length) setAlertas(alts);
+    } catch (e) { console.warn("Error cargando historial:", e); }
+  }, []);
+
+  useEffect(() => {
+    const intervalo = setInterval(async () => {
+      const pid = pacienteActivoIdRef.current ?? undefined;
       try {
-        const [suero, vitales, alts] = await Promise.all([
-          getSueroPorMinuto(60, pid),    // ← pasar pid
-          getVitalesPorMinuto(60, pid),  // ← pasar pid
-          getAlertas(50, pid),           // ← pasar pid
+        const [suero, alts] = await Promise.all([
+          getSueroPorMinuto(60, pid),
+          getAlertas(50, pid),
         ]);
         if (suero?.length) {
           setHistorialSuero(suero);
           setLive(l => ({ ...l, ...suero[suero.length - 1] }));
         }
-        if (vitales?.length) {
-          setHistorialVitales(vitales);
-          const ultimo = vitales[vitales.length - 1];
-          ultimosVitalesRef.current = { fc: ultimo.fc, spo2: ultimo.spo2, estado_vitales: ultimo.estado_vitales };
-          setLive(l => ({ ...l, fc: ultimo.fc, spo2: ultimo.spo2, estado_vitales: ultimo.estado_vitales }));
-        }
         if (alts?.length) setAlertas(alts);
-      } catch (e) { console.warn("Error cargando historial:", e); }
-  }, []);
-
-  useEffect(() => {
-      const intervalo = setInterval(async () => {
-        const pid = pacienteActivoIdRef.current ?? undefined;  // ← NUEVO
-        try {
-          const [suero, alts] = await Promise.all([
-            getSueroPorMinuto(60, pid),  // ← pasar pid
-            getAlertas(50, pid),         // ← pasar pid
-          ]);
-          if (suero?.length) {
-            setHistorialSuero(suero);
-            setLive(l => ({ ...l, ...suero[suero.length - 1] }));
-          }
-          if (alts?.length) setAlertas(alts);
-        } catch (e) { console.warn("Error recargando:", e); }
-      }, 60_000);
-      return () => clearInterval(intervalo);
+      } catch (e) { console.warn("Error recargando:", e); }
+    }, 60_000);
+    return () => clearInterval(intervalo);
   }, []);
 
   useEffect(() => {
@@ -90,22 +90,22 @@ export function useLecturas(onPacienteActivo?: () => void) {
           if (msg.type !== "paciente_activo" && bloqueadoRef.current) return;
 
           if (msg.type === "paciente_activo") {
-              bloqueadoRef.current = true;
-              resetEstado();                                           // 1. limpiar todo + id = null
-              pacienteActivoIdRef.current = msg.paciente?.id ?? null; // 2. setear nuevo id DESPUÉS del reset
-              setTimeout(() => {
-                cargarHistorial().then(() => {
-                  bloqueadoRef.current = false;
-                  onPacienteActivoRef.current?.();
-                });
-              }, 500);
-              return;
+            bloqueadoRef.current = true;
+            resetEstado();
+            pacienteActivoIdRef.current = msg.paciente?.id ?? null;
+            setTimeout(() => {
+              cargarHistorial().then(() => {
+                bloqueadoRef.current = false;
+                onPacienteActivoRef.current?.();
+              });
+            }, 500);
+            return;
           }
 
           if (msg.type === "lectura" && msg.data) {
             const suero: DatosSuero = msg.data;
-            // ← filtrar por paciente activo
-            if (pacienteActivoIdRef.current && suero.paciente_id &&
+            // ← ignorar si hay paciente activo y el mensaje es de otro (o sin paciente_id)
+            if (pacienteActivoIdRef.current !== null &&
                 suero.paciente_id !== pacienteActivoIdRef.current) return;
 
             setHistorialSuero(prev => [...prev, suero].slice(-300));
@@ -124,8 +124,8 @@ export function useLecturas(onPacienteActivo?: () => void) {
 
           if (msg.type === "vitales" && msg.data) {
             const vitales: DatosVitales = msg.data;
-            // ← filtrar por paciente activo
-            if (pacienteActivoIdRef.current && vitales.paciente_id &&
+            // ← ignorar si hay paciente activo y el mensaje es de otro (o sin paciente_id)
+            if (pacienteActivoIdRef.current !== null &&
                 vitales.paciente_id !== pacienteActivoIdRef.current) return;
 
             if (vitales.fc > 0 && vitales.spo2 > 0) {
