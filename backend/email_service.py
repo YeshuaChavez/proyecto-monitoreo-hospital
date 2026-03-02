@@ -1,9 +1,10 @@
 """
 email_service.py
-- Envía correo con HTML bonito (signos vitales + alertas)
+- Envía correo con HTML bonito (signos vitales + alertas clínicas)
 - Adjunta PDF con reporte completo
 - Usa Resend API (HTTP) — funciona en Railway gratuito
 - Datos del paciente tomados dinámicamente de la BD
+- Alertas: solo clínicas (FC_ALTA, FC_BAJA, SPO2_BAJA, SPO2_CRITICA)
 """
 
 import os
@@ -27,6 +28,9 @@ except ImportError:
 RESEND_API_KEY  = os.environ.get("RESEND_API_KEY",  "")
 EMAIL_REMITENTE = os.environ.get("EMAIL_REMITENTE", "onboarding@resend.dev")
 
+# Tipos de alerta relevantes para el familiar (solo clínicas)
+ALERTAS_CLINICAS = {"FC_ALTA", "FC_BAJA", "SPO2_BAJA", "SPO2_CRITICA"}
+
 
 # ══════════════════════════════════════════════════════════════
 #  HELPERS
@@ -46,6 +50,10 @@ def _campo(paciente: dict | None, key: str, fallback: str = "—") -> str:
         return fallback
     return paciente.get(key) or fallback
 
+def _filtrar_alertas_clinicas(alertas: list) -> list:
+    """Solo retorna alertas clínicas relevantes para el familiar."""
+    return [a for a in alertas if a.get("tipo") in ALERTAS_CLINICAS]
+
 
 # ══════════════════════════════════════════════════════════════
 #  HTML
@@ -54,7 +62,9 @@ def _construir_html(payload: dict, alertas: list, hora: str, paciente: dict | No
     fc    = payload.get("fc",    0)
     spo2  = payload.get("spo2",  0)
     peso  = payload.get("peso",  0)
-    bomba = payload.get("bomba", False)
+
+    # Solo alertas clínicas para el familiar
+    alertas_clinicas = _filtrar_alertas_clinicas(alertas)
 
     # Datos del paciente desde la BD
     nombre        = _nombre_completo(paciente)
@@ -75,48 +85,58 @@ def _construir_html(payload: dict, alertas: list, hora: str, paciente: dict | No
     estado_spo2 = "ALERTA" if (spo2 > 0 and spo2 < 95)           else "Normal" if spo2 > 0 else "Sin sensor"
     estado_peso = "CRÍTICO" if peso < 100 else "BAJO" if peso < 150 else "Normal"
 
-    bg_fc   = "rgba(239,68,68,0.15)"  if "ALERTA" in estado_fc   else "rgba(16,185,129,0.12)"
-    bg_spo2 = "rgba(239,68,68,0.15)"  if "ALERTA" in estado_spo2 else "rgba(16,185,129,0.12)"
-    bg_peso = "rgba(239,68,68,0.15)"  if estado_peso == "CRÍTICO" else "rgba(245,158,11,0.15)" if estado_peso == "BAJO" else "rgba(16,185,129,0.12)"
+    bg_fc    = "rgba(239,68,68,0.15)"  if "ALERTA" in estado_fc   else "rgba(16,185,129,0.12)"
+    bg_spo2  = "rgba(239,68,68,0.15)"  if "ALERTA" in estado_spo2 else "rgba(16,185,129,0.12)"
+    bg_peso  = "rgba(239,68,68,0.15)"  if estado_peso == "CRÍTICO" else "rgba(245,158,11,0.15)" if estado_peso == "BAJO" else "rgba(16,185,129,0.12)"
     txt_peso = "#ef4444" if estado_peso == "CRÍTICO" else "#f59e0b" if estado_peso == "BAJO" else "#10b981"
 
-    # Bloque alertas
+    hay_alertas_criticas = bool(alertas_clinicas)
+
+    # Bloque alertas — solo clínicas
     bloque_alertas = ""
-    if alertas:
+    if alertas_clinicas:
+        iconos = {
+            "FC_ALTA":     "❤️‍🔥",
+            "FC_BAJA":     "💔",
+            "SPO2_BAJA":   "🫁",
+            "SPO2_CRITICA":"🚨",
+        }
+        descripciones = {
+            "FC_ALTA":     "Taquicardia detectada — frecuencia cardíaca elevada",
+            "FC_BAJA":     "Bradicardia detectada — frecuencia cardíaca baja",
+            "SPO2_BAJA":   "Saturación de oxígeno por debajo del rango normal",
+            "SPO2_CRITICA":"Saturación de oxígeno en nivel crítico",
+        }
         filas = ""
-        for a in alertas:
-            tipo    = a.get("tipo", "")
-            mensaje = a.get("mensaje", "")
-            em      = {"BOMBA_ON":"💉","SUERO_CRITICO":"🚨","SUERO_BAJO":"⚠️","FC_ALTA":"❤️","FC_BAJA":"❤️","SPO2_BAJA":"🫁"}.get(tipo, "⚠️")
-            es_crit = tipo in ("SUERO_CRITICO", "FC_ALTA", "FC_BAJA", "SPO2_BAJA")
-            color_a = "#ef4444" if es_crit else "#f59e0b"
+        for a in alertas_clinicas:
+            tipo = a.get("tipo", "")
+            em   = iconos.get(tipo, "⚠️")
+            desc = descripciones.get(tipo, a.get("mensaje", ""))
             filas += f"""
             <tr>
-              <td style="padding:12px 14px;border-bottom:1px solid #1a2235;font-size:18px;width:40px;vertical-align:middle">{em}</td>
+              <td style="padding:12px 14px;border-bottom:1px solid #1a2235;font-size:22px;width:44px;vertical-align:middle">{em}</td>
               <td style="padding:12px 14px;border-bottom:1px solid #1a2235;vertical-align:middle">
-                <span style="color:{color_a};font-size:12px;font-weight:700;font-family:monospace">{tipo.replace('_',' ')}</span><br>
-                <span style="color:#cbd5e1;font-size:12px">{mensaje}</span>
+                <span style="color:#ef4444;font-size:12px;font-weight:700;font-family:monospace">{tipo.replace('_',' ')}</span><br>
+                <span style="color:#cbd5e1;font-size:12px">{desc}</span>
               </td>
             </tr>"""
         bloque_alertas = f"""
         <div style="margin-bottom:28px">
-          <p style="color:#94a3b8;font-size:10px;font-family:monospace;letter-spacing:0.14em;margin:0 0 10px;text-transform:uppercase">⚡ Alertas Detectadas</p>
+          <p style="color:#94a3b8;font-size:10px;font-family:monospace;letter-spacing:0.14em;margin:0 0 10px;text-transform:uppercase">
+            🩺 Alertas Clínicas Detectadas
+          </p>
           <div style="background:#0a1020;border:1px solid rgba(239,68,68,0.3);border-left:3px solid #ef4444;border-radius:12px;overflow:hidden">
             <table width="100%" cellpadding="0" cellspacing="0">{filas}</table>
           </div>
+          <p style="color:#6b7280;font-size:10px;margin:8px 0 0;font-family:monospace">
+            ⚠️ Por favor comuníquese con el personal médico de guardia.
+          </p>
         </div>"""
 
-    bomba_badge = """<span style="background:rgba(245,158,11,0.15);color:#f59e0b;
-        padding:3px 10px;border-radius:99px;font-size:9px;font-weight:700;font-family:monospace">
-        ⚙️ BOMBA ACTIVA</span>""" if bomba else """<span style="background:rgba(16,185,129,0.12);color:#10b981;
-        padding:3px 10px;border-radius:99px;font-size:9px;font-weight:700;font-family:monospace">
-        ✅ BOMBA EN STANDBY</span>"""
-
-    # Bloque contacto familiar (solo si hay datos)
+    # Bloque contacto familiar
     bloque_contacto = ""
     if contacto_nom != "—":
         bloque_contacto = f"""
-  <!-- CONTACTO FAMILIAR -->
   <div style="background:#0d1628;border:1px solid rgba(167,139,250,0.15);border-radius:14px;
               padding:16px 22px;margin-bottom:20px">
     <p style="color:#a78bfa;font-size:9px;font-family:monospace;letter-spacing:0.16em;margin:0 0 10px">
@@ -159,7 +179,8 @@ def _construir_html(payload: dict, alertas: list, hora: str, paciente: dict | No
       CONSULTORIO GENERAL
     </p>
     <p style="color:#374151;font-size:11px;margin:8px 0 0;font-family:monospace">{hora}</p>
-  </div>
+    ""  
+</div>
 
   <!-- DATOS PACIENTE -->
   <div style="background:#0d1628;border:1px solid rgba(0,229,255,0.15);border-radius:14px;
@@ -167,18 +188,13 @@ def _construir_html(payload: dict, alertas: list, hora: str, paciente: dict | No
     <p style="color:#00e5ff;font-size:9px;font-family:monospace;letter-spacing:0.16em;margin:0 0 12px">
       👤 DATOS DEL PACIENTE
     </p>
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
-      <div>
-        <div style="font-size:17px;font-weight:800;color:#f1f5f9">{nombre}</div>
-        <div style="font-size:11px;color:#6b7280;margin-top:4px;font-family:monospace">
-          ID: {id_pac} &nbsp;·&nbsp; Consultorio General
-        </div>
-        <div style="font-size:11px;color:#6b7280;margin-top:2px;font-family:monospace">
-          {doctor} &nbsp;·&nbsp; Grupo: {grupo_sang} &nbsp;·&nbsp; Ingreso: {fecha_ingreso}
-        </div>
+    <div>
+      <div style="font-size:17px;font-weight:800;color:#f1f5f9">{nombre}</div>
+      <div style="font-size:11px;color:#6b7280;margin-top:4px;font-family:monospace">
+        ID: {id_pac} &nbsp;·&nbsp; Consultorio General
       </div>
-      <div style="text-align:right">
-        {bomba_badge}
+      <div style="font-size:11px;color:#6b7280;margin-top:2px;font-family:monospace">
+        {doctor} &nbsp;·&nbsp; Grupo: {grupo_sang} &nbsp;·&nbsp; Ingreso: {fecha_ingreso}
       </div>
     </div>
   </div>
@@ -269,7 +285,9 @@ def _generar_pdf(payload: dict, alertas: list, paciente: dict | None = None) -> 
         print("⚠️ PDF no generado — reportlab no disponible")
         return None
 
-    # Datos del paciente
+    # Solo alertas clínicas en el PDF
+    alertas_clinicas = _filtrar_alertas_clinicas(alertas)
+
     nombre        = _nombre_completo(paciente)
     id_pac        = _id_paciente(paciente)
     doctor        = _campo(paciente, "doctor")
@@ -294,7 +312,6 @@ def _generar_pdf(payload: dict, alertas: list, paciente: dict | None = None) -> 
     gris_osc  = colors.HexColor("#475569")
     bg_header = colors.HexColor("#0f172a")
     bg_alt    = colors.HexColor("#f8fafc")
-    morado    = colors.HexColor("#7c3aed")
 
     titulo_s  = ParagraphStyle("titulo",  fontSize=20, textColor=azul_osc,  fontName="Helvetica-Bold", spaceAfter=4,  alignment=1)
     sub_s     = ParagraphStyle("sub",     fontSize=10, textColor=gris_osc,  fontName="Helvetica",      spaceAfter=2,  alignment=1)
@@ -305,7 +322,6 @@ def _generar_pdf(payload: dict, alertas: list, paciente: dict | None = None) -> 
     fc    = payload.get("fc",    0)
     spo2  = payload.get("spo2",  0)
     peso  = payload.get("peso",  0)
-    bomba = payload.get("bomba", False)
     hora  = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
     estado_fc   = "Normal" if 60 <= fc   <= 100 else "ALERTA"  if fc   > 0 else "Sin sensor"
@@ -320,7 +336,7 @@ def _generar_pdf(payload: dict, alertas: list, paciente: dict | None = None) -> 
         HRFlowable(width="100%", thickness=1.5, color=azul_cian, spaceAfter=12),
     ]
 
-    # Tabla paciente — con datos de la BD
+    # Tabla paciente
     elementos.append(Paragraph("▸ Datos del Paciente", seccion_s))
     filas_paciente = [
         ["Campo",            "Información"],
@@ -331,7 +347,6 @@ def _generar_pdf(payload: dict, alertas: list, paciente: dict | None = None) -> 
         ["Grupo sanguíneo",  grupo_sang],
         ["Fecha de ingreso", fecha_ingreso],
     ]
-    # Agregar contacto familiar si existe
     if contacto_nom != "—":
         filas_paciente.append(["Contacto familiar", f"{contacto_nom} ({contacto_rel}) — {contacto_tel}"])
 
@@ -382,12 +397,20 @@ def _generar_pdf(payload: dict, alertas: list, paciente: dict | None = None) -> 
     ]))
     elementos += [t_vitales, Spacer(1, 0.2*inch)]
 
-    # Tabla alertas
-    if alertas:
-        elementos.append(Paragraph("▸ Alertas Detectadas", seccion_s))
+    # Tabla alertas clínicas — solo FC y SpO2, sin bomba ni suero
+    if alertas_clinicas:
+        elementos.append(Paragraph("▸ Alertas Clínicas Detectadas", seccion_s))
+        descripciones = {
+            "FC_ALTA":     "Taquicardia — frecuencia cardíaca elevada",
+            "FC_BAJA":     "Bradicardia — frecuencia cardíaca baja",
+            "SPO2_BAJA":   "Saturación de oxígeno por debajo del rango normal",
+            "SPO2_CRITICA":"Saturación de oxígeno en nivel crítico",
+        }
         t_alertas = [["Tipo", "Descripción"]]
-        for a in alertas:
-            t_alertas.append([a.get("tipo", "").replace("_", " "), a.get("mensaje", "")])
+        for a in alertas_clinicas:
+            tipo = a.get("tipo", "")
+            desc = descripciones.get(tipo, a.get("mensaje", ""))
+            t_alertas.append([tipo.replace("_", " "), desc])
         ta = Table(t_alertas, colWidths=[1.8*inch, 4.7*inch])
         ta.setStyle(TableStyle([
             ("BACKGROUND",     (0, 0), (-1,  0), colors.HexColor("#7f1d1d")),
@@ -438,9 +461,13 @@ async def enviar_email_familiar(
         return
 
     resend.api_key = RESEND_API_KEY
-    hora  = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    html  = _construir_html(payload, alertas, hora, paciente)
+    hora   = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    html   = _construir_html(payload, alertas, hora, paciente)
     nombre = _nombre_completo(paciente)
+
+    # Asunto dinámico según alertas clínicas
+    alertas_clinicas = _filtrar_alertas_clinicas(alertas)
+    asunto = f"Reporte de salud — {nombre}"
 
     attachments = []
     pdf_bytes   = _generar_pdf(payload, alertas, paciente)
@@ -453,7 +480,7 @@ async def enviar_email_familiar(
         params = {
             "from":    f"Monitor IoT Posta Médica <{EMAIL_REMITENTE}>",
             "to":      [destinatario],
-            "subject": f"Reporte de salud — {nombre} · {hora[:16]}",
+            "subject": asunto,
             "html":    html,
         }
         reply_to = os.environ.get("EMAIL_REPLY_TO", "")
