@@ -1,12 +1,10 @@
-import { useMemo } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine, Area, AreaChart,
+  Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import {
   BarChart2, Download, Heart, Wind, Droplets,
-  TrendingDown, Clock, AlertTriangle, CheckCircle,
-  XCircle, Activity, Gauge, FlaskConical,
+  CheckCircle, XCircle, Activity,
 } from "lucide-react";
 import { EstadoLive, DatosVitales, DatosSuero } from "../tipos";
 
@@ -17,34 +15,9 @@ interface Props {
   config?:           { peso_alerta: number; peso_critico: number };
 }
 
-function regresionLineal(puntos: { x: number; y: number }[]) {
-  const n = puntos.length;
-  if (n < 2) return { pendiente: 0, intercepto: 0, r2: 0 };
-  const sumX  = puntos.reduce((a, p) => a + p.x, 0);
-  const sumY  = puntos.reduce((a, p) => a + p.y, 0);
-  const sumXY = puntos.reduce((a, p) => a + p.x * p.y, 0);
-  const sumX2 = puntos.reduce((a, p) => a + p.x * p.x, 0);
-  const pendiente  = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-  const intercepto = (sumY - pendiente * sumX) / n;
-  const mediaY = sumY / n;
-  const ssTot  = puntos.reduce((a, p) => a + (p.y - mediaY) ** 2, 0);
-  const ssRes  = puntos.reduce((a, p) => a + (p.y - (pendiente * p.x + intercepto)) ** 2, 0);
-  const r2     = ssTot === 0 ? 1 : 1 - ssRes / ssTot;
-  return { pendiente, intercepto, r2 };
-}
-
-function detectarAnomalia(tasas: number[]) {
-  if (tasas.length < 5) return { anomalia: false, zScore: 0 };
-  const media = tasas.reduce((a, b) => a + b, 0) / tasas.length;
-  const std   = Math.sqrt(tasas.reduce((a, b) => a + (b - media) ** 2, 0) / tasas.length);
-  if (std === 0) return { anomalia: false, zScore: 0 };
-  const zScore = Math.abs((tasas[tasas.length - 1] - media) / std);
-  return { anomalia: zScore > 2.5, zScore: +zScore.toFixed(2) };
-}
-
 const Analytics = ({ live, historialVitales = [], historialSuero = [], config = { peso_alerta: 150, peso_critico: 100 } }: Props) => {
 
-  const datos = (historialVitales ?? []).filter(h => h.fc > 0 && h.spo2 > 0);
+  const datos = historialVitales.filter(h => h.fc > 0 && h.spo2 > 0);
   const total = datos.length || 1;
 
   const promedioFC   = (datos.reduce((a, b) => a + b.fc,   0) / total).toFixed(0);
@@ -54,12 +27,12 @@ const Analytics = ({ live, historialVitales = [], historialSuero = [], config = 
   const minSpO2 = datos.length ? Math.min(...datos.map(h => h.spo2)) : 0;
 
   const estadisticas = [
-    { label: "FC Promedio",   valor: datos.length ? promedioFC   : "--", unidad: "bpm", color: "#f43f5e", icon: <Heart size={14}/>   },
-    { label: "FC Mínima",     valor: datos.length ? minFC        : "--", unidad: "bpm", color: "#f59e0b", icon: <Heart size={14}/>   },
-    { label: "FC Máxima",     valor: datos.length ? maxFC        : "--", unidad: "bpm", color: "#ef4444", icon: <Heart size={14}/>   },
-    { label: "SpO2 Promedio", valor: datos.length ? promedioSpO2 : "--", unidad: "%",   color: "#00e5ff", icon: <Wind size={14}/>    },
-    { label: "SpO2 Mínima",   valor: datos.length ? minSpO2      : "--", unidad: "%",   color: "#f59e0b", icon: <Wind size={14}/>    },
-    { label: "Fluido actual", valor: live.peso.toFixed(1),               unidad: "g",   color: "#a78bfa", icon: <Droplets size={14}/> },
+    { label: "FC Promedio",   valor: datos.length ? promedioFC   : "--", unidad: "bpm", color: "#f43f5e", icon: <Heart size={14}/>    },
+    { label: "FC Mínima",     valor: datos.length ? minFC        : "--", unidad: "bpm", color: "#f59e0b", icon: <Heart size={14}/>    },
+    { label: "FC Máxima",     valor: datos.length ? maxFC        : "--", unidad: "bpm", color: "#ef4444", icon: <Heart size={14}/>    },
+    { label: "SpO2 Promedio", valor: datos.length ? promedioSpO2 : "--", unidad: "%",   color: "#00e5ff", icon: <Wind size={14}/>     },
+    { label: "SpO2 Mínima",   valor: datos.length ? minSpO2      : "--", unidad: "%",   color: "#f59e0b", icon: <Wind size={14}/>     },
+    { label: "Fluido actual", valor: live.peso.toFixed(1),               unidad: "ml",  color: "#a78bfa", icon: <Droplets size={14}/> },
   ];
 
   const paneles = [
@@ -74,44 +47,15 @@ const Analytics = ({ live, historialVitales = [], historialSuero = [], config = 
     {
       titulo: "Interpretación SpO2", color: "#00e5ff", icon: <Wind size={14}/>,
       items: [
-        { label: "Rango normal",      valor: "≥ 95%",             ok: true },
-        { label: "Promedio actual",   valor: `${promedioSpO2}%`,  ok: +promedioSpO2 >= 95 },
-        { label: "Mínimo registrado", valor: `${minSpO2}%`,       ok: +minSpO2 >= 90 },
+        { label: "Rango normal",      valor: "≥ 95%",            ok: true },
+        { label: "Promedio actual",   valor: `${promedioSpO2}%`, ok: +promedioSpO2 >= 95 },
+        { label: "Mínimo registrado", valor: `${minSpO2}%`,      ok: +minSpO2 >= 90 },
       ],
     },
   ];
 
-  const mlSuero = useMemo(() => {
-    const datos = (historialSuero ?? []).filter(d => d.peso > 0).slice(-60);
-    if (datos.length < 5) return null;
-    const puntos = datos.map((d, i) => ({ x: i, y: d.peso }));
-    const { pendiente, intercepto, r2 } = regresionLineal(puntos);
-    const tasaGxMin = -(pendiente * 60);
-    const tasas: number[] = [];
-    for (let i = 1; i < datos.length; i++) tasas.push(datos[i-1].peso - datos[i].peso);
-    const { anomalia, zScore } = detectarAnomalia(tasas);
-    let claseGoteo = "NORMAL", colorGoteo = "#10b981";
-    if (tasaGxMin < 0.5)      { claseGoteo = "DETENIDO"; colorGoteo = "#ef4444"; }
-    else if (tasaGxMin < 1.5) { claseGoteo = "LENTO";    colorGoteo = "#f59e0b"; }
-    else if (tasaGxMin > 6)   { claseGoteo = "RÁPIDO";   colorGoteo = "#f59e0b"; }
-    const pesoActual = datos[datos.length - 1].peso;
-    const base = intercepto + pendiente * (datos.length - 1);
-    const minHastaCritico = pendiente < 0 ? Math.max(0, +(((100 - base) / -(pendiente * 60)).toFixed(0))) : null;
-    const minHastaVacio   = pendiente < 0 ? Math.max(0, +(((0   - base) / -(pendiente * 60)).toFixed(0))) : null;
-    const tendencia = datos.map((d, i) => ({
-      ...d, tendencia: +(intercepto + pendiente * i).toFixed(1),
-    }));
-    const colorCritico = minHastaCritico !== null && minHastaCritico < 30 ? "#ef4444" : "#f59e0b";
-    return {
-      r2: +r2.toFixed(3), tasaGxMin: +tasaGxMin.toFixed(2),
-      claseGoteo, colorGoteo, anomalia, zScore, pesoActual,
-      minHastaCritico, minHastaVacio, colorCritico,
-      tendencia, muestras: datos.length,
-    };
-  }, [historialSuero]);
-
   const Card = ({ children, style = {} }: any) => (
-    <div className="card" style={{
+    <div style={{
       background: "rgba(13,17,28,0.8)",
       border: "1px solid rgba(255,255,255,0.06)",
       borderRadius: 16, padding: 20, ...style,
@@ -142,7 +86,7 @@ const Analytics = ({ live, historialVitales = [], historialSuero = [], config = 
   const exportarCSV = (tipo: "suero" | "vitales") => {
     if (tipo === "suero") {
       if (!historialSuero.length) return;
-      const headers = ["ID", "Timestamp", "Hora", "Peso (g)", "Bomba", "Estado Suero"];
+      const headers = ["ID", "Timestamp", "Hora", "Volumen (ml)", "Bomba", "Estado Suero"];
       const filas = historialSuero.map(r => [r.id, r.timestamp, r.time, r.peso, r.bomba ? "SI" : "NO", r.estado_suero]);
       descargarCSV([headers, ...filas], `suero_${fecha()}.csv`);
     } else {
@@ -175,7 +119,7 @@ const Analytics = ({ live, historialVitales = [], historialSuero = [], config = 
           </h2>
           <p style={{ fontSize: 12, color: "#4b5563", margin: "4px 0 0", fontFamily: "'JetBrains Mono', monospace" }}>
             {datos.length > 0
-              ? `Estadísticas de ${datos.length} promedios válidos (bloques de 10s)`
+              ? `Estadísticas de ${datos.length} promedios válidos`
               : "Sin promedios aún — coloca el dedo en el sensor MAX30102"}
           </p>
         </div>
@@ -209,7 +153,7 @@ const Analytics = ({ live, historialVitales = [], historialSuero = [], config = 
         </div>
       </div>
 
-      {/* SECCIÓN 1 */}
+      {/* SECCIÓN 1: Estadísticas */}
       <SectionLabel text="SIGNOS VITALES — ESTADÍSTICAS" color="#00e5ff" icon={<Activity size={12}/>} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12, marginBottom: 24 }}>
@@ -225,7 +169,7 @@ const Analytics = ({ live, historialVitales = [], historialSuero = [], config = 
         ))}
       </div>
 
-      {/* SECCIÓN 2: Gráfica */}
+      {/* SECCIÓN 2: Gráfica FC y SpO2 */}
       <Card style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 16, color: "#e2e8f0", display: "flex", alignItems: "center", gap: 8 }}>
           <BarChart2 size={14} color="#6b7280"/> FC y SpO2 — Vista Comparativa
@@ -255,8 +199,36 @@ const Analytics = ({ live, historialVitales = [], historialSuero = [], config = 
         )}
       </Card>
 
-      {/* SECCIÓN 3: Interpretación clínica */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 8 }}>
+      {/* SECCIÓN 3: Gráfica Suero */}
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 16, color: "#e2e8f0", display: "flex", alignItems: "center", gap: 8 }}>
+          <Droplets size={14} color="#a78bfa"/> Fluido IV — Nivel (ml)
+        </div>
+        {historialSuero.length === 0 ? (
+          <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "#4b5563", fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+            Sin datos de suero aún
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={historialSuero} margin={{ top: 5, right: 20, bottom: 0, left: -10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e2436" />
+              <XAxis dataKey="time" tick={{ fontSize: 9, fill: "#374151" }} interval={9} />
+              <YAxis domain={[0, 600]} tick={{ fontSize: 9, fill: "#a78bfa" }} />
+              <Tooltip
+                contentStyle={{ background: "rgba(10,14,26,0.95)", border: "1px solid #1e2436", borderRadius: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}
+                formatter={(val: any) => [`${Number(val).toFixed(1)} ml`, "Fluido IV"]}
+              />
+              <ReferenceLine y={config.peso_alerta}  stroke="#f59e0b" strokeDasharray="4 2" label={{ value: `Alerta ${config.peso_alerta} ml`,   position: "right", fontSize: 9, fill: "#f59e0b" }} />
+              <ReferenceLine y={config.peso_critico} stroke="#ef4444" strokeDasharray="4 2" label={{ value: `Crítico ${config.peso_critico} ml`, position: "right", fontSize: 9, fill: "#ef4444" }} />
+              <Line type="monotone" dataKey="peso" stroke="#a78bfa" strokeWidth={2} dot={false} name="Fluido (ml)" />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </Card>
+
+      {/* SECCIÓN 4: Interpretación clínica */}
+      <SectionLabel text="INTERPRETACIÓN CLÍNICA" color="#10b981" icon={<Activity size={12}/>} />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         {paneles.map((panel, i) => (
           <Card key={i} style={{ border: `1px solid ${panel.color}20` }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: panel.color, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
@@ -266,10 +238,7 @@ const Analytics = ({ live, historialVitales = [], historialSuero = [], config = 
               <div key={j} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <span style={{ fontSize: 12, color: "#9ca3af" }}>{item.label}</span>
                 <span style={{ fontSize: 12, fontWeight: 600, color: item.ok ? "#10b981" : "#ef4444", fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 5 }}>
-                  {item.ok
-                    ? <CheckCircle size={12} color="#10b981"/>
-                    : <XCircle    size={12} color="#ef4444"/>
-                  }
+                  {item.ok ? <CheckCircle size={12} color="#10b981"/> : <XCircle size={12} color="#ef4444"/>}
                   {item.valor}
                 </span>
               </div>
@@ -278,121 +247,6 @@ const Analytics = ({ live, historialVitales = [], historialSuero = [], config = 
         ))}
       </div>
 
-      {/* SECCIÓN 4: ML */}
-      <SectionLabel text="MACHINE LEARNING — ANÁLISIS DE FLUIDO IV" color="#a78bfa" icon={<FlaskConical size={12}/>} />
-
-      {mlSuero ? (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
-
-            {/* Tasa de goteo */}
-            <Card style={{ borderTop: `2px solid ${mlSuero.colorGoteo}` }}>
-              <div style={{ marginBottom: 4, color: mlSuero.colorGoteo, opacity: 0.8 }}><Gauge size={14}/></div>
-              <MetaLabel text="Tasa de goteo" />
-              <div style={{ fontSize: 30, fontWeight: 800, color: mlSuero.colorGoteo, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>{mlSuero.tasaGxMin}</div>
-              <div style={{ fontSize: 10, color: "#4b5563", marginTop: 3 }}>g / min</div>
-              <div style={{ marginTop: 8, display: "inline-block", padding: "2px 8px", borderRadius: 99, fontSize: 9, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", background: `${mlSuero.colorGoteo}18`, color: mlSuero.colorGoteo }}>
-                {mlSuero.claseGoteo}
-              </div>
-            </Card>
-
-            {/* Tiempo hasta crítico */}
-            <Card style={{ borderTop: `2px solid ${mlSuero.colorCritico}` }}>
-              <div style={{ marginBottom: 4, color: mlSuero.colorCritico, opacity: 0.8 }}><Clock size={14}/></div>
-              <MetaLabel text="Tiempo hasta crítico" />
-              <div style={{ fontSize: 30, fontWeight: 800, color: mlSuero.minHastaCritico !== null ? mlSuero.colorCritico : "#6b7280", fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>
-                {mlSuero.minHastaCritico !== null ? mlSuero.minHastaCritico : "—"}
-              </div>
-              <div style={{ fontSize: 10, color: "#4b5563", marginTop: 3 }}>minutos</div>
-              <div style={{ fontSize: 9, marginTop: 6, fontFamily: "'JetBrains Mono', monospace", color: mlSuero.minHastaCritico !== null && mlSuero.minHastaCritico < 30 ? "#ef4444" : "#374151", display: "flex", alignItems: "center", gap: 4 }}>
-                {mlSuero.minHastaCritico !== null && mlSuero.minHastaCritico < 30
-                  ? <><AlertTriangle size={10}/> URGENTE</>
-                  : "umbral: 100g"
-                }
-              </div>
-            </Card>
-
-            {/* Tiempo hasta vacío */}
-            <Card style={{ borderTop: "2px solid #ef4444" }}>
-              <div style={{ marginBottom: 4, color: "#ef4444", opacity: 0.8 }}><TrendingDown size={14}/></div>
-              <MetaLabel text="Tiempo hasta vacío" />
-              <div style={{ fontSize: 30, fontWeight: 800, color: mlSuero.minHastaVacio !== null ? "#ef4444" : "#6b7280", fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>
-                {mlSuero.minHastaVacio !== null ? mlSuero.minHastaVacio : "—"}
-              </div>
-              <div style={{ fontSize: 10, color: "#4b5563", marginTop: 3 }}>minutos</div>
-              <div style={{ fontSize: 9, color: "#374151", marginTop: 6, fontFamily: "'JetBrains Mono', monospace" }}>peso: {mlSuero.pesoActual.toFixed(0)}g</div>
-            </Card>
-
-            {/* Anomalía */}
-            <Card style={{ borderTop: `2px solid ${mlSuero.anomalia ? "#ef4444" : "#10b981"}` }}>
-              <div style={{ marginBottom: 4, color: mlSuero.anomalia ? "#ef4444" : "#10b981", opacity: 0.8 }}>
-                {mlSuero.anomalia ? <AlertTriangle size={14}/> : <CheckCircle size={14}/>}
-              </div>
-              <MetaLabel text="Anomalía en goteo" />
-              <div style={{ fontSize: 30, fontWeight: 800, color: mlSuero.anomalia ? "#ef4444" : "#10b981", fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>
-                {mlSuero.anomalia ? "SÍ" : "NO"}
-              </div>
-              <div style={{ fontSize: 10, color: "#4b5563", marginTop: 3 }}>z-score: {mlSuero.zScore}</div>
-              <div style={{ fontSize: 9, color: "#374151", marginTop: 6, fontFamily: "'JetBrains Mono', monospace" }}>
-                {mlSuero.anomalia ? "Revisar catéter" : "Flujo estable"}
-              </div>
-            </Card>
-          </div>
-
-          {/* Gráfica peso + tendencia */}
-          <Card>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", display: "flex", alignItems: "center", gap: 8 }}>
-                <Droplets size={14} color="#a78bfa"/> Fluido IV — Peso real + Línea de tendencia
-              </div>
-              <div style={{ display: "flex", gap: 16, fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "#6b7280" }}>
-                <span><span style={{ color: "#a78bfa" }}>●</span> Peso real</span>
-                <span><span style={{ color: "#f59e0b" }}>- -</span> Tendencia ML</span>
-                <span style={{ color: "#374151" }}>R² = {mlSuero.r2}</span>
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={mlSuero.tendencia} margin={{ top: 5, right: 20, bottom: 0, left: -10 }}>
-                <defs>
-                  <linearGradient id="gradPesoML" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#a78bfa" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e2436" />
-                <XAxis dataKey="time" tick={{ fontSize: 9, fill: "#374151" }} interval={9} />
-                <YAxis domain={[0, 600]} tick={{ fontSize: 9, fill: "#6b7280" }} />
-                <Tooltip
-                  contentStyle={{ background: "rgba(10,14,26,0.95)", border: "1px solid #1e2436", borderRadius: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}
-                  formatter={(val: any, name?: string) => [`${Number(val).toFixed(1)}g`, name === "peso" ? "Peso real" : "Tendencia ML"] as [string, string]}
-                />
-                <ReferenceLine y={150} stroke="#f59e0b" strokeDasharray="4 2" label={{ value: "Alerta 150g",  position: "right", fontSize: 9, fill: "#f59e0b" }} />
-                <ReferenceLine y={100} stroke="#ef4444" strokeDasharray="4 2" label={{ value: "CRÍTICO 100g", position: "right", fontSize: 9, fill: "#ef4444" }} />
-                <Area type="monotone" dataKey="peso"      stroke="#a78bfa" strokeWidth={2} fill="url(#gradPesoML)" dot={false} name="peso" />
-                <Line type="monotone" dataKey="tendencia" stroke="#f59e0b" strokeWidth={1.5} dot={false} strokeDasharray="5 3" name="tendencia" />
-              </AreaChart>
-            </ResponsiveContainer>
-            <div style={{ marginTop: 12, padding: "8px 12px", background: "rgba(167,139,250,0.06)", borderRadius: 8, fontSize: 11, color: "#9ca3af", fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 8 }}>
-              <FlaskConical size={12} color="#a78bfa"/>
-              Modelo: Regresión Lineal (mínimos cuadrados) · {mlSuero.muestras} muestras · R² = {mlSuero.r2}
-              {mlSuero.r2 >= 0.85
-                ? <span style={{ color: "#10b981" }}> · Ajuste excelente</span>
-                : mlSuero.r2 >= 0.6
-                  ? <span style={{ color: "#f59e0b" }}> · Ajuste moderado</span>
-                  : <span style={{ color: "#ef4444" }}> · Patrón irregular</span>
-              }
-            </div>
-          </Card>
-        </>
-      ) : (
-        <Card style={{ textAlign: "center", padding: 40 }}>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-            <Droplets size={36} color="#374151" />
-          </div>
-          <div style={{ color: "#6b7280", fontSize: 13 }}>Acumulando datos de suero...</div>
-          <div style={{ color: "#374151", fontSize: 11, marginTop: 4, fontFamily: "'JetBrains Mono', monospace" }}>Se necesitan al menos 5 lecturas del HX711</div>
-        </Card>
-      )}
     </div>
   );
 };

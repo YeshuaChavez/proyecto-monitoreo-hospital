@@ -66,7 +66,7 @@ const Monitor = ({ live, historialSuero = [], historialVitales = [] }: Props) =>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <InsigniaAlerta label={fcMostrar   > 0 ? `FC ${fcMostrar} bpm`        : "FC Sin sensor"}   type={estadoFCReal} />
           <InsigniaAlerta label={spo2Mostrar > 0 ? `SpO2 ${spo2Mostrar}%`       : "SpO2 Sin sensor"} type={estadoSpo2Real} />
-          <InsigniaAlerta label={`IV ${pesoMostrar.toFixed(1)}g`}                                     type={estadoFluido} />
+          <InsigniaAlerta label={`IV ${pesoMostrar.toFixed(1)} ml`}                                   type={estadoFluido} />
           <InsigniaAlerta label={live.bomba ? "BOMBA ACTIVA" : "BOMBA OFF"}                           type={live.bomba ? "warn" : "ok"} />
         </div>
       </div>
@@ -140,7 +140,7 @@ const Monitor = ({ live, historialSuero = [], historialVitales = [] }: Props) =>
               <span style={{ fontSize: 42, fontWeight: 800, color: colorFluido, lineHeight: 1, fontFamily: "'JetBrains Mono', monospace" }}>
                 {pesoMostrar.toFixed(1)}
               </span>
-              <span style={{ fontSize: 13, color: "#6b7280" }}>g</span>
+              <span style={{ fontSize: 13, color: "#6b7280" }}>ml</span>
             </div>
           </div>
           <BarraFluido peso={pesoMostrar} />
@@ -163,7 +163,6 @@ const Monitor = ({ live, historialSuero = [], historialVitales = [] }: Props) =>
 
           <div style={{ fontSize: 10, color: "#6b7280", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono', monospace", marginBottom: 10 }}>BOMBA PERISTÁLTICA</div>
 
-          {/* Icono con anillo pulsante */}
           <div style={{ position: "relative", display: "inline-block", marginBottom: 10 }}>
             <div style={{
               width: 42, height: 42, borderRadius: 12,
@@ -278,7 +277,7 @@ const Monitor = ({ live, historialSuero = [], historialVitales = [] }: Props) =>
             <Droplets size={14} /> Nivel de Fluido IV
           </div>
           <div style={{ fontSize: 10, color: "#4b5563", fontFamily: "'JetBrains Mono', monospace", marginBottom: 16 }}>
-            Alerta: 150g · Bomba ON / Crítico: 100g — actualización c/1s
+            Alerta: 150 ml · Bomba ON / Crítico: 100 ml — actualización c/1s
           </div>
           <ResponsiveContainer width="100%" height={120}>
             <AreaChart data={datosPeso} margin={{ top: 5, right: 60, bottom: 0, left: -20 }}>
@@ -291,9 +290,9 @@ const Monitor = ({ live, historialSuero = [], historialVitales = [] }: Props) =>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e2436" />
               <XAxis dataKey="time" tick={{ fontSize: 9, fill: "#374151" }} interval={9} />
               <YAxis domain={[0, 500]} tick={{ fontSize: 9, fill: "#374151" }} />
-              <Tooltip content={<TooltipPersonalizado unit="g" color="#a78bfa" />} />
-              <ReferenceLine y={150} stroke="#f59e0b" strokeDasharray="4 4" strokeOpacity={0.6} label={{ value: "Alerta 150g", fontSize: 9, fill: "#f59e0b", position: "right" }} />
-              <ReferenceLine y={100} stroke="#ef4444" strokeDasharray="4 4" strokeOpacity={0.6} label={{ value: "Crítico 100g", fontSize: 9, fill: "#ef4444", position: "right" }} />
+              <Tooltip content={<TooltipPersonalizado unit="ml" color="#a78bfa" />} />
+              <ReferenceLine y={150} stroke="#f59e0b" strokeDasharray="4 4" strokeOpacity={0.6} label={{ value: "Alerta 150 ml", fontSize: 9, fill: "#f59e0b", position: "right" }} />
+              <ReferenceLine y={100} stroke="#ef4444" strokeDasharray="4 4" strokeOpacity={0.6} label={{ value: "Crítico 100 ml", fontSize: 9, fill: "#ef4444", position: "right" }} />
               <Area type="monotone" dataKey="peso" stroke="#a78bfa" strokeWidth={2} fill="url(#gradPesoMon)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>

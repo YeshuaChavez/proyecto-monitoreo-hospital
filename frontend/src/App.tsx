@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
-import { getConfig } from "./services/api";
+import { useState } from "react";
 import BarraNavegacion from "./components/BarraNavegacion";
 import Login from "./pages/Login";
 import Monitor from "./pages/Monitor";
@@ -15,17 +14,6 @@ import "./index.css";
 function App() {
   const [usuarioActual, setUsuarioActual] = useState<UsuarioLogin | null>(null);
   const [tab, setTab] = useState("paciente");
-  const [config, setConfig] = useState({ peso_alerta: 150, peso_critico: 100 });
-
-  const cargarConfig = useCallback(async () => {
-    try {
-      const c = await getConfig();
-      if (c?.peso_alerta) setConfig({ peso_alerta: c.peso_alerta, peso_critico: c.peso_critico });
-    } catch {}
-  }, []);
-
-  useEffect(() => { cargarConfig(); }, [cargarConfig]);
-
   const {
     live,
     historialSuero,
@@ -33,12 +21,11 @@ function App() {
     conectado,
     alertas,
     setAlertas,
-    resetEstado,
-  } = useLecturas(cargarConfig);  // ← recarga config cuando cambia paciente
+  } = useLecturas();
 
   if (!usuarioActual) return <Login onLogin={setUsuarioActual} />;
 
-  const esAdmin = usuarioActual.rol === "admin" || usuarioActual.usuario === "admin";
+  const esAdmin = usuarioActual.rol === "Administrador" || usuarioActual.usuario === "admin";
 
   return (
     <div style={{
@@ -65,10 +52,10 @@ function App() {
 
       <main style={{ position: "relative", zIndex: 1, padding: "28px 32px", maxWidth: 1400, margin: "0 auto" }}>
         {tab === "overview"  && <Monitor       live={live} historialSuero={historialSuero} historialVitales={historialVitales} />}
-        {tab === "analytics" && <Analytics     live={live} historialVitales={historialVitales} historialSuero={historialSuero} config={config} />}
-        {tab === "paciente"  && <Paciente      live={live} alertas={alertas} onPacienteSeleccionado={() => setTab("paciente")} />}
+        {tab === "analytics" && <Analytics     live={live} historialVitales={historialVitales} historialSuero={historialSuero} />}
+        {tab === "paciente"  && <Paciente      live={live} alertas={alertas} />}
         {tab === "alertas"   && <Alertas       alertas={alertas} limpiarAlertas={() => setAlertas([])} />}
-        {tab === "config"    && <Config        usuarioActual={usuarioActual} onConfigGuardada={cargarConfig} />}
+        {tab === "config"    && <Config        usuarioActual={usuarioActual} />}
         {tab === "admin" && esAdmin && <Administracion usuarioActual={usuarioActual} />}
         {tab === "admin" && !esAdmin && (
           <div style={{ textAlign:"center", padding:"80px 20px" }}>

@@ -7,8 +7,8 @@ interface Paciente {
   nombre:            string;
   apellido:          string;
   codigo:            string;
-  doctor:            string;       // nombre — solo para mostrar en tabla
-  doctor_id:         number | null; // FK — para el dropdown
+  doctor:            string;
+  doctor_id:         number | null;
   grupo_sanguineo:   string;
   fecha_nacimiento:  string;
   fecha_ingreso:     string;
@@ -137,7 +137,6 @@ const Administracion = ({ usuarioActual }: Props) => {
     width: "100%", outline: "none", boxSizing: "border-box",
   };
 
-  // Campos de texto simples (sin doctor)
   const camposTexto: [string, keyof Paciente][] = [
     ["Nombre *",            "nombre"],
     ["Apellido *",          "apellido"],
@@ -198,18 +197,12 @@ const Administracion = ({ usuarioActual }: Props) => {
         </div>
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-
-          {/* Cabecera */}
           <div style={{
             display:"grid", gridTemplateColumns:"1fr 1.2fr 1fr 1fr 90px",
             gap:12, padding:"8px 16px",
             fontSize:9, color:"#4b5563", fontFamily:"'JetBrains Mono', monospace", letterSpacing:"0.1em",
           }}>
-            <span>PACIENTE</span>
-            <span>CÓDIGO / DOCTOR</span>
-            <span>CONTACTO</span>
-            <span>ESTADO</span>
-            <span>ACCIONES</span>
+            <span>PACIENTE</span><span>CÓDIGO / DOCTOR</span><span>CONTACTO</span><span>ESTADO</span><span>ACCIONES</span>
           </div>
 
           {filtrados.map(p => (
@@ -296,7 +289,6 @@ const Administracion = ({ usuarioActual }: Props) => {
 
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
 
-              {/* Campos de texto */}
               {camposTexto.map(([label, key]) => (
                 <div key={key} style={{ gridColumn: spanCompleto.has(key as string) ? "1/-1" : "auto" }}>
                   <div style={{ fontSize:9, color:"#6b7280", fontFamily:"'JetBrains Mono', monospace", marginBottom:4, letterSpacing:"0.08em" }}>
@@ -310,8 +302,8 @@ const Administracion = ({ usuarioActual }: Props) => {
                 </div>
               ))}
 
-              {/* Dropdown doctor — ocupa columna completa */}
-              <div style={{ gridColumn: "1/-1", position: "relative" }}>
+              {/* ── Dropdown doctor — fondo oscuro forzado ── */}
+              <div style={{ gridColumn: "1/-1" }}>
                 <div style={{
                   fontSize: 9, color: "#6b7280",
                   fontFamily: "'JetBrains Mono', monospace",
@@ -320,14 +312,13 @@ const Administracion = ({ usuarioActual }: Props) => {
                 }}>
                   <Stethoscope size={10} color="#6b7280" /> DOCTOR / ENFERMERO ASIGNADO
                 </div>
-
                 <div style={{ position: "relative" }}>
                   <select
                     value={form.doctor_id ?? ""}
                     onChange={e => setForm(f => ({ ...f, doctor_id: e.target.value ? Number(e.target.value) : null }))}
                     style={{
                       width: "100%",
-                      background: "rgba(255,255,255,0.05)",
+                      background: "#0d111c",
                       border: "1px solid rgba(0,229,255,0.2)",
                       borderRadius: 8,
                       color: form.doctor_id ? "#e2e8f0" : "#6b7280",
@@ -338,22 +329,21 @@ const Administracion = ({ usuarioActual }: Props) => {
                       outline: "none",
                       appearance: "none",
                       WebkitAppearance: "none",
+                      MozAppearance: "none",
                       boxSizing: "border-box",
-                    }}
+                      colorScheme: "dark",
+                    } as React.CSSProperties}
                   >
-                    <option value=""        style={{ background: "#0d111c", color: "#6b7280" }}>— Sin asignar —</option>
+                    <option value="" style={{ background: "#0d111c", color: "#6b7280" }}>— Sin asignar —</option>
                     {medicos.map(m => (
                       <option key={m.id} value={m.id} style={{ background: "#0d111c", color: "#e2e8f0" }}>
                         {m.nombre} ({m.rol})
                       </option>
                     ))}
                   </select>
-
-                  {/* Flecha custom */}
                   <div style={{
                     position: "absolute", right: 12, top: "50%",
-                    transform: "translateY(-50%)",
-                    pointerEvents: "none", color: "#00e5ff",
+                    transform: "translateY(-50%)", pointerEvents: "none",
                   }}>
                     <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
                       <path d="M1 1L5 5L9 1" stroke="#00e5ff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -407,15 +397,11 @@ const Administracion = ({ usuarioActual }: Props) => {
               <button onClick={() => eliminar(confirmDel)} style={{
                 flex:1, background:"rgba(239,68,68,0.12)", border:"1px solid rgba(239,68,68,0.35)",
                 color:"#ef4444", borderRadius:9, padding:"10px 0", fontSize:13, fontWeight:700, cursor:"pointer",
-              }}>
-                Desactivar
-              </button>
+              }}>Desactivar</button>
               <button onClick={() => setConfirmDel(null)} style={{
                 flex:1, background:"rgba(107,114,128,0.07)", border:"1px solid rgba(107,114,128,0.2)",
                 color:"#6b7280", borderRadius:9, padding:"10px 0", fontSize:13, cursor:"pointer",
-              }}>
-                Cancelar
-              </button>
+              }}>Cancelar</button>
             </div>
           </div>
         </div>

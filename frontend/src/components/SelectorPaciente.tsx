@@ -1,20 +1,18 @@
 import { useState, useEffect, useRef } from "react";
-import { PacienteDB } from "../tipos";
+import { PacienteDB, UsuarioLogin } from "../tipos";
 import { UserCheck, RefreshCw, ChevronDown, AlertTriangle, CheckCircle, Loader } from "lucide-react";
-
-
 
 const BASE = (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_URL) || "https://proyecto-monitoreo-posta-medica-production.up.railway.app";
 
-// Pasos del flujo de cambio de paciente
 type Paso = "seleccion" | "confirmacion" | "esperando_tare" | "listo";
 
 interface Props {
   onPacienteSeleccionado: (p: PacienteDB) => void;
   pacienteActual:         PacienteDB | null;
+  usuarioActual?:         UsuarioLogin | null;  // ← nuevo
 }
 
-const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => {
+const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual, usuarioActual }: Props) => {
   const [pacientes,    setPacientes]    = useState<PacienteDB[]>([]);
   const [abierto,      setAbierto]      = useState(false);
   const [seleccionado, setSeleccionado] = useState<number | null>(pacienteActual?.id ?? null);
@@ -24,7 +22,8 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
   const [error,        setError]        = useState<string | null>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  // Cerrar dropdown al click fuera
+  const esAdmin = usuarioActual?.rol === "Administrador" || usuarioActual?.usuario === "admin";
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (dropRef.current && !dropRef.current.contains(e.target as Node))
@@ -35,11 +34,16 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
   }, []);
 
   useEffect(() => {
-    fetch(`${BASE}/pacientes`)
+    // Admin ve todos, doctor/enfermero solo sus pacientes
+    const url = esAdmin || !usuarioActual
+      ? `${BASE}/pacientes`
+      : `${BASE}/pacientes?doctor_id=${usuarioActual.id}`;
+
+    fetch(url)
       .then(r => r.json())
       .then(setPacientes)
       .catch(() => {});
-  }, []);
+  }, [usuarioActual]);
 
   useEffect(() => {
     fetch(`${BASE}/paciente-activo`)
@@ -61,7 +65,6 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
     setPaso("confirmacion");
   };
 
-  // Paso 1 → Confirmar cambio + mandar reset al ESP32
   const confirmarCambio = async () => {
     if (!temp) return;
     setCargando(true);
@@ -73,7 +76,6 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
         body:    JSON.stringify({ paciente_id: temp.id }),
       });
       if (!res.ok) throw new Error("Error al cambiar paciente");
-      // Reset enviado al ESP32 — ahora esperar que enfermero retire bolsa
       setPaso("esperando_tare");
     } catch (e: any) {
       setError(e.message);
@@ -82,7 +84,6 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
     }
   };
 
-  // Paso 2 → Enfermero retiró la bolsa → mandar tare
   const confirmarTare = async () => {
     setCargando(true);
     setError(null);
@@ -93,11 +94,9 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
         body:    JSON.stringify({ cmd: "tare", origen: "dashboard" }),
       });
       if (!res.ok) throw new Error("Error al calibrar báscula");
-      // Tare enviado — actualizar paciente activo en frontend
       setSeleccionado(temp!.id);
       onPacienteSeleccionado(temp!);
       setPaso("listo");
-      // Volver a estado normal tras 2.5s
       setTimeout(() => {
         setPaso("seleccion");
         setTemp(null);
@@ -119,7 +118,6 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
 
   return (
     <>
-      {/* Barra selector */}
       <div ref={dropRef} style={{ position: "relative", marginBottom: 20 }}>
         <div style={{
           background: "rgba(0,229,255,0.04)",
@@ -148,7 +146,9 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
                 </div>
               ) : (
                 <div style={{ fontSize: 12, color: "#6b7280", fontStyle: "italic" }}>
-                  Ningún paciente seleccionado
+                  {pacientes.length === 0
+                    ? "No tienes pacientes asignados"
+                    : "Ningún paciente seleccionado"}
                 </div>
               )}
             </div>
@@ -156,10 +156,12 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
 
           <button
             onClick={() => setAbierto(a => !a)}
+            disabled={pacientes.length === 0}
             style={{
               background: "rgba(0,229,255,0.08)", border: "1px solid rgba(0,229,255,0.25)",
-              color: "#00e5ff", borderRadius: 8, padding: "7px 14px", fontSize: 12,
-              cursor: "pointer", fontWeight: 600,
+              color: pacientes.length === 0 ? "#374151" : "#00e5ff",
+              borderRadius: 8, padding: "7px 14px", fontSize: 12,
+              cursor: pacientes.length === 0 ? "not-allowed" : "pointer", fontWeight: 600,
               display: "flex", alignItems: "center", gap: 6,
             }}
           >
@@ -169,7 +171,6 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
           </button>
         </div>
 
-        {/* Dropdown */}
         {abierto && (
           <div style={{
             position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200,
@@ -179,7 +180,7 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
           }}>
             {pacientes.length === 0 ? (
               <div style={{ padding: 20, textAlign: "center", color: "#6b7280", fontSize: 12 }}>
-                Sin pacientes registrados
+                No tienes pacientes asignados
               </div>
             ) : pacientes.map(p => (
               <div
@@ -217,7 +218,7 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
         )}
       </div>
 
-      {/* ── MODAL MULTI-PASO ─────────────────────────────────── */}
+      {/* MODAL MULTI-PASO */}
       {paso !== "seleccion" && temp && (
         <div style={{
           position: "fixed", inset: 0, zIndex: 1000,
@@ -229,19 +230,15 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
             border: `1px solid ${paso === "listo" ? "rgba(16,185,129,0.4)" : paso === "esperando_tare" ? "rgba(0,229,255,0.3)" : "rgba(245,158,11,0.3)"}`,
             borderRadius: 18, padding: 32, width: 440,
             textAlign: "center", position: "relative",
-            transition: "border-color 0.3s",
           }}>
-            {/* Barra superior coloreada por paso */}
             <div style={{
               position: "absolute", top: 0, left: 0, right: 0, height: 2,
               background: `linear-gradient(90deg, transparent, ${
                 paso === "listo" ? "#10b981" : paso === "esperando_tare" ? "#00e5ff" : "#f59e0b"
               }, transparent)`,
               borderRadius: "18px 18px 0 0",
-              transition: "background 0.3s",
             }} />
 
-            {/* Indicador de pasos */}
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginBottom: 20 }}>
               {[
                 { n: 1, label: "Confirmar",     activo: paso === "confirmacion" },
@@ -256,7 +253,6 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
                     color: s.activo ? "#00e5ff" : "#374151",
-                    transition: "all 0.3s",
                   }}>
                     {s.n}
                   </div>
@@ -268,23 +264,16 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
               ))}
             </div>
 
-            {/* ── PASO 1: Confirmación ── */}
             {paso === "confirmacion" && (
               <>
                 <div style={{ fontSize: 36, marginBottom: 12 }}>🔄</div>
-                <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 6, color: "#f1f5f9" }}>
-                  Cambiar paciente activo
-                </div>
-                <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 16 }}>
-                  Se iniciará monitoreo para:
-                </div>
+                <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 6, color: "#f1f5f9" }}>Cambiar paciente activo</div>
+                <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 16 }}>Se iniciará monitoreo para:</div>
                 <div style={{
                   background: "rgba(0,229,255,0.06)", border: "1px solid rgba(0,229,255,0.15)",
                   borderRadius: 10, padding: "12px 16px", marginBottom: 16,
                 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#00e5ff" }}>
-                    {temp.nombre} {temp.apellido}
-                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#00e5ff" }}>{temp.nombre} {temp.apellido}</div>
                   <div style={{ fontSize: 11, color: "#4b5563", fontFamily: "'JetBrains Mono', monospace", marginTop: 3 }}>
                     {temp.codigo || `PCT-${temp.id}`} · {temp.doctor || "Sin doctor"}
                   </div>
@@ -299,16 +288,11 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
                     El sistema se reiniciará. En el siguiente paso se te pedirá retirar la bolsa antes de calibrar.
                   </div>
                 </div>
-                {error && (
-                  <div style={{ marginBottom: 12, fontSize: 11, color: "#ef4444", fontFamily: "'JetBrains Mono', monospace" }}>
-                    ⚠ {error}
-                  </div>
-                )}
+                {error && <div style={{ marginBottom: 12, fontSize: 11, color: "#ef4444", fontFamily: "'JetBrains Mono', monospace" }}>⚠ {error}</div>}
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={confirmarCambio} disabled={cargando} style={{
                     flex: 1, background: "rgba(0,229,255,0.1)", border: "1px solid rgba(0,229,255,0.35)",
-                    color: "#00e5ff", borderRadius: 10, padding: "11px 0",
-                    fontSize: 13, fontWeight: 700,
+                    color: "#00e5ff", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 700,
                     cursor: cargando ? "not-allowed" : "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
                   }}>
@@ -317,28 +301,19 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
                   <button onClick={cancelar} style={{
                     flex: 1, background: "rgba(107,114,128,0.07)", border: "1px solid rgba(107,114,128,0.2)",
                     color: "#6b7280", borderRadius: 10, padding: "11px 0", fontSize: 13, cursor: "pointer",
-                  }}>
-                    Cancelar
-                  </button>
+                  }}>Cancelar</button>
                 </div>
               </>
             )}
 
-            {/* ── PASO 2: Retirar bolsa ── */}
             {paso === "esperando_tare" && (
               <>
                 <div style={{ fontSize: 44, marginBottom: 12 }}>🧴</div>
-                <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8, color: "#f1f5f9" }}>
-                  Retire la bolsa de suero
-                </div>
+                <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8, color: "#f1f5f9" }}>Retire la bolsa de suero</div>
                 <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 20, lineHeight: 1.6 }}>
-                  Desconecte y retire la bolsa del paciente anterior de la báscula.
-                  <br />
-                  <span style={{ color: "#00e5ff", fontWeight: 600 }}>
-                    Cuando la báscula esté vacía, presione el botón.
-                  </span>
+                  Desconecte y retire la bolsa del paciente anterior de la báscula.<br/>
+                  <span style={{ color: "#00e5ff", fontWeight: 600 }}>Cuando la báscula esté vacía, presione el botón.</span>
                 </div>
-
                 <div style={{
                   background: "rgba(0,229,255,0.05)", border: "1px solid rgba(0,229,255,0.15)",
                   borderRadius: 10, padding: "12px 16px", marginBottom: 20,
@@ -350,45 +325,32 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
                   <div>③ Asegúrate de que la báscula esté libre</div>
                   <div>④ Presiona <span style={{ color: "#00e5ff" }}>"Báscula vacía"</span></div>
                 </div>
-
-                {error && (
-                  <div style={{ marginBottom: 12, fontSize: 11, color: "#ef4444", fontFamily: "'JetBrains Mono', monospace" }}>
-                    ⚠ {error}
-                  </div>
-                )}
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={confirmarTare} disabled={cargando} style={{
-                    flex: 1,
-                    background: cargando ? "rgba(0,229,255,0.04)" : "rgba(0,229,255,0.12)",
-                    border: `1px solid ${cargando ? "rgba(0,229,255,0.1)" : "rgba(0,229,255,0.4)"}`,
-                    color: cargando ? "#374151" : "#00e5ff",
-                    borderRadius: 10, padding: "12px 0",
-                    fontSize: 13, fontWeight: 700,
-                    cursor: cargando ? "not-allowed" : "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-                  }}>
-                    {cargando
-                      ? <><Loader size={13} style={{ animation: "spin 1s linear infinite" }} /> Calibrando...</>
-                      : <><CheckCircle size={14} /> Báscula vacía — calibrar</>
-                    }
-                  </button>
-                </div>
+                {error && <div style={{ marginBottom: 12, fontSize: 11, color: "#ef4444", fontFamily: "'JetBrains Mono', monospace" }}>⚠ {error}</div>}
+                <button onClick={confirmarTare} disabled={cargando} style={{
+                  width: "100%",
+                  background: cargando ? "rgba(0,229,255,0.04)" : "rgba(0,229,255,0.12)",
+                  border: `1px solid ${cargando ? "rgba(0,229,255,0.1)" : "rgba(0,229,255,0.4)"}`,
+                  color: cargando ? "#374151" : "#00e5ff",
+                  borderRadius: 10, padding: "12px 0", fontSize: 13, fontWeight: 700,
+                  cursor: cargando ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                }}>
+                  {cargando
+                    ? <><Loader size={13} style={{ animation: "spin 1s linear infinite" }} /> Calibrando...</>
+                    : <><CheckCircle size={14} /> Báscula vacía — calibrar</>
+                  }
+                </button>
                 <div style={{ marginTop: 10, fontSize: 10, color: "#374151", fontFamily: "'JetBrains Mono', monospace" }}>
                   El ESP32 emitirá 2 pitidos cuando esté listo
                 </div>
               </>
             )}
 
-            {/* ── PASO 3: Listo ── */}
             {paso === "listo" && (
               <>
                 <div style={{ fontSize: 44, marginBottom: 12 }}>✅</div>
-                <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8, color: "#10b981" }}>
-                  Sistema listo
-                </div>
-                <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 8 }}>
-                  Báscula calibrada correctamente.
-                </div>
+                <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8, color: "#10b981" }}>Sistema listo</div>
+                <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 8 }}>Báscula calibrada correctamente.</div>
                 <div style={{
                   background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)",
                   borderRadius: 10, padding: "10px 16px",
@@ -403,9 +365,7 @@ const SelectorPaciente = ({ onPacienteSeleccionado, pacienteActual }: Props) => 
         </div>
       )}
 
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </>
   );
 };

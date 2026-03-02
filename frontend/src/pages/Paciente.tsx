@@ -9,15 +9,16 @@ import InsigniaAlerta from "../components/InsigniaAlerta";
 import BarraFluido from "../components/BarraFluido";
 import EscenaPaciente from "../components/EscenaPaciente";
 import SelectorPaciente from "../components/SelectorPaciente";
-import { EstadoLive, Alerta, PacienteDB } from "../tipos";
+import { EstadoLive, Alerta, PacienteDB, UsuarioLogin } from "../tipos";
 import { enviarComando, enviarEmail } from "../services/api";
 
 
 
 interface Props {
-  live:                    EstadoLive;
-  alertas?:                Alerta[];
-  onPacienteSeleccionado?: () => void;  // ← agrega esta línea
+  live:            EstadoLive;
+  alertas?:         Alerta[];
+  onPacienteSeleccionado?: () => void;
+  usuarioActual?:  UsuarioLogin | null;
 }
 
 const Campo = ({ label, valor, icon }: { label: string; valor?: string; icon?: React.ReactNode }) => (
@@ -38,7 +39,7 @@ const TopBar = ({ color }: { color: string }) => (
   <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${color},transparent)` }}/>
 );
 
-const Paciente = ({ live, alertas = [], onPacienteSeleccionado }: Props) => {
+const Paciente = ({ live, alertas = [], onPacienteSeleccionado, usuarioActual }: Props) => {
   if (!live) return null;
 
   const [pacienteActual, setPacienteActual] = useState<PacienteDB | null>(null);
@@ -99,6 +100,7 @@ const Paciente = ({ live, alertas = [], onPacienteSeleccionado }: Props) => {
       {/* Selector de paciente */}
       <SelectorPaciente
         pacienteActual={pacienteActual}
+        usuarioActual={usuarioActual}
         onPacienteSeleccionado={(p) => {
           setPacienteActual(p);
           onPacienteSeleccionado?.();
@@ -212,16 +214,16 @@ const Paciente = ({ live, alertas = [], onPacienteSeleccionado }: Props) => {
                 </div>
                 <BarraFluido peso={live.peso}/>
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
-                  <span style={{ fontSize: 9, color: "#374151", fontFamily: "'JetBrains Mono', monospace" }}>0g</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", fontFamily: "'JetBrains Mono', monospace" }}>{live.peso.toFixed(1)} g</span>
-                  <span style={{ fontSize: 9, color: "#374151", fontFamily: "'JetBrains Mono', monospace" }}>500g</span>
+                  <span style={{ fontSize: 9, color: "#374151", fontFamily: "'JetBrains Mono', monospace" }}>0 ml</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", fontFamily: "'JetBrains Mono', monospace" }}>{live.peso.toFixed(1)} ml</span>
+                  <span style={{ fontSize: 9, color: "#374151", fontFamily: "'JetBrains Mono', monospace" }}>500 ml</span>
                 </div>
                 <div style={{ marginTop: 7, fontSize: 10, color: "#4b5563", display: "flex", gap: 12 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <AlertTriangle size={10} color="#f59e0b"/> Advertencia: 150g
+                    <AlertTriangle size={10} color="#f59e0b"/> Advertencia: 150 ml
                   </span>
                   <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <Activity size={10} color="#ef4444"/> Bomba ON: 100g
+                    <Activity size={10} color="#ef4444"/> Bomba ON: 100 ml
                   </span>
                 </div>
               </div>
@@ -304,7 +306,7 @@ const Paciente = ({ live, alertas = [], onPacienteSeleccionado }: Props) => {
                 </span>
                 <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <Droplets size={11} color="#a78bfa"/>
-                  <span style={{ color: "#a78bfa" }}>{live.peso.toFixed(1)}g</span>
+                  <span style={{ color: "#a78bfa" }}>{live.peso.toFixed(1)} ml</span>
                 </span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

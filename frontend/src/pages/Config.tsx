@@ -144,7 +144,7 @@ const Config = ({ usuarioActual, onConfigGuardada }: Props) => {
             />
             <span style={{ fontSize: 14, color: "#f59e0b", fontWeight: 700,
               fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}>
-              g
+              ml
             </span>
           </div>
           <input
@@ -155,7 +155,7 @@ const Config = ({ usuarioActual, onConfigGuardada }: Props) => {
           />
           <div style={{ display: "flex", justifyContent: "space-between",
             fontSize: 9, color: "#374151", fontFamily: "'JetBrains Mono', monospace" }}>
-            <span>50g</span><span>490g</span>
+            <span>50ml</span><span>490ml</span>
           </div>
         </div>
 
@@ -179,7 +179,7 @@ const Config = ({ usuarioActual, onConfigGuardada }: Props) => {
             />
             <span style={{ fontSize: 14, color: "#ef4444", fontWeight: 700,
               fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}>
-              g
+              ml
             </span>
           </div>
           <input
@@ -190,7 +190,7 @@ const Config = ({ usuarioActual, onConfigGuardada }: Props) => {
           />
           <div style={{ display: "flex", justifyContent: "space-between",
             fontSize: 9, color: "#374151", fontFamily: "'JetBrains Mono', monospace" }}>
-            <span>10g</span><span>{pesoAlerta - 10}g</span>
+            <span>10ml</span><span>{pesoAlerta - 10}ml</span>
           </div>
         </div>
 
@@ -224,9 +224,9 @@ const Config = ({ usuarioActual, onConfigGuardada }: Props) => {
           </div>
           <div style={{ display: "flex", justifyContent: "space-between",
             fontSize: 9, marginTop: 6, fontFamily: "'JetBrains Mono', monospace" }}>
-            <span style={{ color: "#ef4444" }}>🔴 Crítico 0–{pesoCritico}g</span>
-            <span style={{ color: "#f59e0b" }}>🟡 Alerta {pesoCritico}–{pesoAlerta}g</span>
-            <span style={{ color: "#10b981" }}>🟢 Normal {pesoAlerta}–500g</span>
+            <span style={{ color: "#ef4444" }}>🔴 Crítico 0–{pesoCritico}ml</span>
+            <span style={{ color: "#f59e0b" }}>🟡 Alerta {pesoCritico}–{pesoAlerta}ml</span>
+            <span style={{ color: "#10b981" }}>🟢 Normal {pesoAlerta}–500ml</span>
           </div>
         </div>
 
@@ -325,13 +325,13 @@ const Config = ({ usuarioActual, onConfigGuardada }: Props) => {
                 <span style={{ color: "#f59e0b", display: "flex", alignItems: "center", gap: 5 }}>
                   <AlertTriangle size={11} color="#f59e0b" /> Umbral alerta
                 </span>
-                <span style={{ color: "#e2e8f0", fontWeight: 700 }}>{pesoAlerta} g</span>
+                <span style={{ color: "#e2e8f0", fontWeight: 700 }}>{pesoAlerta} ml</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: "#ef4444", display: "flex", alignItems: "center", gap: 5 }}>
                   <AlertOctagon size={11} color="#ef4444" /> Umbral crítico
                 </span>
-                <span style={{ color: "#e2e8f0", fontWeight: 700 }}>{pesoCritico} g</span>
+                <span style={{ color: "#e2e8f0", fontWeight: 700 }}>{pesoCritico} ml</span>
               </div>
             </div>
 
