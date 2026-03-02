@@ -116,18 +116,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         db = SessionLocal()
         try:
-            # Filtrar por paciente activo
-            q_suero   = db.query(Suero).order_by(Suero.id.desc())
-            q_vitales = db.query(Vitales).order_by(Vitales.id.desc())
-
-            if _paciente_activo_id:
-                q_suero   = q_suero.filter(Suero.paciente_id    == _paciente_activo_id)
-                q_vitales = q_vitales.filter(Vitales.paciente_id == _paciente_activo_id)
-
-            ultimo_suero    = q_suero.first()
-            ultimos_vitales = q_vitales.first()
-
-            # ← PRIMERO paciente_activo, para que el frontend haga reset antes
+            # Solo mandar paciente_activo, sin lectura ni vitales iniciales
             if _paciente_activo_id:
                 p = db.query(Paciente).filter(Paciente.id == _paciente_activo_id).first()
                 if p:
@@ -135,26 +124,6 @@ async def websocket_endpoint(websocket: WebSocket):
                         "type":     "paciente_activo",
                         "paciente": p.to_dict(),
                     }, default=str))
-
-            # ← DESPUÉS los datos (ya filtrados por paciente)
-            if ultimo_suero:
-                await websocket.send_text(json.dumps({
-                    "type": "lectura",
-                    "data": ultimo_suero.to_dict(),
-                    "estado": {
-                        **ultimo_suero.to_dict(),
-                        **(ultimos_vitales.to_dict() if ultimos_vitales else {
-                            "fc": 0, "spo2": 0, "estado_vitales": "MIDIENDO"
-                        }),
-                    }
-                }, default=str))
-
-            if ultimos_vitales:
-                await websocket.send_text(json.dumps({
-                    "type": "vitales",
-                    "data": ultimos_vitales.to_dict(), #
-                }, default=str))
-
         finally:
             db.close()
 
