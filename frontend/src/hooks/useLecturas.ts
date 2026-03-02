@@ -78,6 +78,10 @@ export function useLecturas(onPacienteActivo?: () => void) {
 
           if (msg.type === "lectura" && msg.data) {
             const suero: DatosSuero = msg.data;
+            setHistorialSuero(prev => {
+              const nuevo = [...prev, suero];
+              return nuevo.slice(-300); // mantener últimas 300 lecturas (~5min)
+            });
             const vRef = ultimosVitalesRef.current;
             const fc   = (msg.estado?.fc   && msg.estado.fc   > 0) ? msg.estado.fc   : vRef.fc;
             const spo2 = (msg.estado?.spo2 && msg.estado.spo2 > 0) ? msg.estado.spo2 : vRef.spo2;

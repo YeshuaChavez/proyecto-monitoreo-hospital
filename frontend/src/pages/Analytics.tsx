@@ -99,7 +99,7 @@ const Analytics = ({ live, historialVitales = [], historialSuero = [], config = 
     historialSuero.filter((_, i) => i % 10 === 0 || i === historialSuero.length - 1),
     // Solo recalcular cuando cambia el largo, no cada segundo
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [historialSuero.length > 0 ? Math.floor(historialSuero.length / 10) : 0]
+    [Math.floor(historialSuero.length / 10)]
   );
 
   const flujoInfo = useMemo(() =>
