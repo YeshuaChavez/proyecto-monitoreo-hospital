@@ -615,6 +615,7 @@ async def seleccionar_paciente(body: SeleccionarPacienteRequest):
 
         mqtt_manager.set_paciente_activo(p.to_dict())
         await mqtt_manager.publicar_comando("reset")
+        await asyncio.sleep(0.5)  # ← dar tiempo al MQTT de procesar
 
         # ← NUEVO: revisar peso actual y activar bomba si es necesario
         cfg = db.query(Config).filter(
