@@ -152,7 +152,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if ultimos_vitales:
                 await websocket.send_text(json.dumps({
                     "type": "vitales",
-                    "data": ultimos_vitales.to_dict(),
+                    "data": ultimos_vitales.to_dict(), #
                 }, default=str))
 
         finally:
@@ -166,7 +166,7 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_manager.disconnect(websocket)
     except Exception:
         ws_manager.disconnect(websocket)
-        
+
 # ═══════════════════════════════════════════════════════════════
 #  REST — GENERAL
 # ═══════════════════════════════════════════════════════════════
