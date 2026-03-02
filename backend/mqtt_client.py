@@ -33,7 +33,7 @@ UMBRAL_FC_ALTA = 100
 UMBRAL_FC_BAJA = 60
 UMBRAL_SPO2    = 95
 
-INTERVALO_TELEGRAM = 15
+INTERVALO_TELEGRAM = 10
 ESTADOS_INACTIVOS  = {"INICIANDO", "ESPERANDO"}
 
 
@@ -134,7 +134,7 @@ class MQTTManager:
         if estado_suero in ESTADOS_INACTIVOS:
             return []
 
-        cfg            = get_config()
+        cfg            = get_config(paciente_id=self._get_paciente_id())
         umbral_alerta  = cfg["peso_alerta"]
         umbral_critico = cfg["peso_critico"]
 
@@ -259,7 +259,6 @@ class MQTTManager:
         bomba        = payload.get("bomba",  False)
         estado_suero = payload.get("estado", "ESPERANDO")
 
-        # FIX P4: si bomba acaba de apagarse, resetear origen
         bomba_anterior = self._ultimo_suero.get("bomba", False)
         if bomba_anterior and not bomba:
             self.ultimo_origen = "automatico"
@@ -284,6 +283,13 @@ class MQTTManager:
         if alertas:
             await ws_manager.broadcast({"type": "alertas", "data": alertas})
             await self._enviar_telegram_si_aplica(payload_completo, alertas)
+
+        # ← NUEVO: activar bomba automáticamente si peso <= crítico y bomba aún no activa
+        if estado_suero not in ESTADOS_INACTIVOS and not bomba:
+            cfg = get_config(paciente_id=self._get_paciente_id())
+            if peso <= cfg["peso_critico"]:
+                await self.publicar_comando("bomba_on")
+                print(f"🚨 Bomba AUTO — {peso:.1f}ml <= crítico {cfg['peso_critico']}ml")
 
     # ── Handler: vitales → tabla vitales ─────────────────────
     async def _procesar_vitales(self, payload: dict, ws_manager):

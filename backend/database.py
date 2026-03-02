@@ -34,12 +34,17 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     print("✅ Base de datos inicializada")
 
-def get_config() -> dict:
-    """Retorna la configuración activa o valores por defecto."""
+def get_config(paciente_id: int | None = None) -> dict:
+    """Retorna la configuración del paciente activo, o global, o defaults."""
     from models import Config
     db = SessionLocal()
     try:
-        cfg = db.query(Config).order_by(Config.id.desc()).first()
+        if paciente_id:
+            cfg = db.query(Config).filter(Config.paciente_id == paciente_id).order_by(Config.id.desc()).first()
+            if cfg:
+                return {"peso_alerta": cfg.peso_alerta, "peso_critico": cfg.peso_critico}
+        # fallback: config global
+        cfg = db.query(Config).filter(Config.paciente_id == None).order_by(Config.id.desc()).first()
         if cfg:
             return {"peso_alerta": cfg.peso_alerta, "peso_critico": cfg.peso_critico}
         return {"peso_alerta": 150.0, "peso_critico": 100.0}
