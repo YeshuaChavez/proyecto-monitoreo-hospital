@@ -71,8 +71,11 @@ export function useLecturas(onPacienteActivo?: () => void) {
 
           if (msg.type === "paciente_activo") {
             resetEstado();
-            cargarHistorial();
-            onPacienteActivoRef.current?.();  // ← recarga config en App
+            // Pequeño delay para que el backend termine de setear el nuevo paciente_activo_id
+            setTimeout(() => {
+              cargarHistorial();
+              onPacienteActivoRef.current?.();
+            }, 500);  // 500ms es suficiente
             return;
           }
 
