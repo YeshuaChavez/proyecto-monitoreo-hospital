@@ -116,8 +116,16 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         db = SessionLocal()
         try:
-            ultimo_suero    = db.query(Suero).order_by(Suero.id.desc()).first()
-            ultimos_vitales = db.query(Vitales).order_by(Vitales.id.desc()).first()
+            # Filtrar por paciente activo
+            q_suero   = db.query(Suero).order_by(Suero.id.desc())
+            q_vitales = db.query(Vitales).order_by(Vitales.id.desc())
+
+            if _paciente_activo_id:
+                q_suero   = q_suero.filter(Suero.paciente_id   == _paciente_activo_id)
+                q_vitales = q_vitales.filter(Vitales.paciente_id == _paciente_activo_id)
+
+            ultimo_suero    = q_suero.first()
+            ultimos_vitales = q_vitales.first()
 
             if ultimo_suero:
                 await websocket.send_text(json.dumps({
@@ -157,7 +165,6 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_manager.disconnect(websocket)
     except Exception:
         ws_manager.disconnect(websocket)
-
 
 # ═══════════════════════════════════════════════════════════════
 #  REST — GENERAL
