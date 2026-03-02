@@ -25,11 +25,12 @@ export function useLecturas(onPacienteActivo?: () => void) {
   useEffect(() => { onPacienteActivoRef.current = onPacienteActivo; }, [onPacienteActivo]);
 
   const resetEstado = useCallback(() => {
-    setLive({ fc:0, spo2:0, peso:500, bomba:false, estado_suero:"NORMAL", estado_vitales:"MIDIENDO" });
-    setHistorialSuero([]);
-    setHistorialVitales([]);
-    setAlertas([]);
-    ultimosVitalesRef.current = { fc:0, spo2:0, estado_vitales:"MIDIENDO" };
+      pacienteActivoIdRef.current = null;  // ← NUEVO: limpiar id al resetear
+      setLive({ fc:0, spo2:0, peso:500, bomba:false, estado_suero:"NORMAL", estado_vitales:"MIDIENDO" });
+      setHistorialSuero([]);
+      setHistorialVitales([]);
+      setAlertas([]);
+      ultimosVitalesRef.current = { fc:0, spo2:0, estado_vitales:"MIDIENDO" };
   }, []);
 
   const cargarHistorial = useCallback(async () => {
@@ -89,17 +90,16 @@ export function useLecturas(onPacienteActivo?: () => void) {
           if (msg.type !== "paciente_activo" && bloqueadoRef.current) return;
 
           if (msg.type === "paciente_activo") {
-            // ← guardar el paciente_id activo
-            pacienteActivoIdRef.current = msg.paciente?.id ?? null;
-            bloqueadoRef.current = true;
-            resetEstado();
-            setTimeout(() => {
-              cargarHistorial().then(() => {
-                bloqueadoRef.current = false;
-                onPacienteActivoRef.current?.();
-              });
-            }, 500);
-            return;
+              bloqueadoRef.current = true;
+              resetEstado();                                           // 1. limpiar todo + id = null
+              pacienteActivoIdRef.current = msg.paciente?.id ?? null; // 2. setear nuevo id DESPUÉS del reset
+              setTimeout(() => {
+                cargarHistorial().then(() => {
+                  bloqueadoRef.current = false;
+                  onPacienteActivoRef.current?.();
+                });
+              }, 500);
+              return;
           }
 
           if (msg.type === "lectura" && msg.data) {
